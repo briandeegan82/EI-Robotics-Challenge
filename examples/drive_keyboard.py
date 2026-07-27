@@ -8,10 +8,11 @@ Controls:
     Up / Down     more / less throttle
     Left / Right  steer
     Space         stop (throttle and steering to zero)
-    Backspace     restart the run
+    Backspace     restart the attempt
 
 The real competition is fully autonomous — this script is just for building
-intuition about the course, the car's handling, and the sensors.
+intuition about the course, the car's handling, and the challenge sections.
+Drive a full lap and the stop cube appears; try to stop within 10 cm of it.
 """
 
 import sys
@@ -86,8 +87,10 @@ def main():
                     time.sleep(0.05)
                 continue
 
-            print(f"\rspeed {obs[11]:5.2f} m/s   light: {info['privileged']['light_state']:<7}"
-                  f"score {info['score']:5d}   t {info['time']:6.1f}s ", end="")
+            p = info["privileged"]
+            print(f"\rspeed {obs[0]:5.2f} m/s   lap {p['progress'] / 14.91 * 100:5.1f}%   "
+                  f"off-line {p['lateral']:+.2f} m   phase {info['phase']:<5}"
+                  f"pts {info['score']:4d}   t {info['time']:6.1f}s ", end="")
 
             viewer.sync()
             leftover = env.model.opt.timestep * 10 - (time.time() - step_start)

@@ -1,16 +1,14 @@
 <!--
-  The Gauntlet — competition course.
+  The Gauntlet - line-following competition track (GENERATED FILE).
 
-  A straight road (~28 m of driving) with three challenge sections:
-    1. Traffic light at x=6 (stop line at x=5.5). Stop on red.
-    2. Bicycle crossing at x=12. The bicycle crosses the road repeatedly;
-       don't hit it.
-    3. Tunnel from x=18 to x=24 with an obstacle inside at x=21. The tunnel is
-       wide enough for the car AND the obstacle — detect it and drive around.
-  Finish line at x=28.
+  Edit gauntlet/track.py or gauntlet/generate_track.py and rerun
+      python -m gauntlet.generate_track
+  instead of editing this file by hand.
 
-  All positions/angles are meters/radians. Course logic (light cycling,
-  bicycle motion, obstacle placement, scoring) lives in gauntlet/env.py.
+  Stadium loop, driven counter-clockwise. White ~25 mm line on dark floor.
+  Sections: start -> lane keeping -> choke point -> curve -> tunnel #1 ->
+  speed section (dynamic obstacle) -> high-glare curve -> tunnel #2 ->
+  end zone (stop cube appears after the lap).
 -->
 <mujoco model="gauntlet">
   <compiler angle="radian" autolimits="true"/>
@@ -18,106 +16,178 @@
 
   <visual>
     <global offwidth="640" offheight="480"/>
-    <headlight diffuse="0.5 0.5 0.5" ambient="0.35 0.35 0.35"/>
+    <!-- weak headlight so the tunnels are genuinely dark on camera -->
+    <headlight diffuse="0.12 0.12 0.12" ambient="0.22 0.22 0.22"/>
   </visual>
 
   <asset>
     <texture type="skybox" builtin="gradient" rgb1="0.45 0.65 0.9" rgb2="0.9 0.95 1" width="256" height="256"/>
-    <texture type="2d" name="grass" builtin="checker" rgb1="0.2 0.3 0.18" rgb2="0.22 0.33 0.2"
+    <texture type="2d" name="carpet" builtin="checker" rgb1="0.16 0.16 0.18" rgb2="0.18 0.18 0.2"
              width="512" height="512"/>
-    <material name="grass" texture="grass" texrepeat="12 12" texuniform="true" reflectance="0"/>
-    <material name="asphalt" rgba="0.25 0.25 0.27 1" reflectance="0.05"/>
-    <material name="paint" rgba="0.9 0.9 0.9 1"/>
-    <material name="curb" rgba="0.75 0.3 0.25 1"/>
-    <material name="tunnel" rgba="0.45 0.45 0.5 1"/>
+    <material name="floor" texture="carpet" texrepeat="16 16" texuniform="true" reflectance="0" specular="0.1"/>
+    <material name="line" rgba="0.93 0.93 0.93 1"/>
+    <!-- high-glare slab: bright + strongly reflective, washes out line contrast -->
+    <material name="glare" rgba="0.8 0.8 0.85 1" reflectance="0.8" specular="1" shininess="1"/>
   </asset>
 
   <worldbody>
-    <light directional="true" pos="10 -6 12" dir="-0.25 0.3 -0.9" diffuse="0.7 0.7 0.7" castshadow="true"/>
+    <light directional="true" pos="3 -4 6" dir="-0.35 0.45 -0.85" diffuse="0.85 0.85 0.8" castshadow="true"/>
+    <light name="tunnel1_light" pos="1.30 1.1 0.21" dir="0 0 -1" diffuse="0.45 0.45 0.4" cutoff="70"/>
 
-    <!-- ground and road -->
-    <geom name="ground" type="plane" size="0 0 1" material="grass"/>
-    <geom name="road" type="box" size="15.5 0.8 0.01" pos="13.5 0 0.01" material="asphalt"/>
+    <geom name="ground" type="plane" size="0 0 1" rgba="0.35 0.4 0.35 1"/>
+    <!-- dark track floor, 7 x 4 m footprint -->
+    <geom name="floor" type="box" size="3.5 2.0 0.01" pos="0 0 0.01" material="floor"/>
+    <!-- high-glare area covering the left curve; ends before the tunnel #2
+         entrance so the glare and low-light challenges stay distinct -->
+    <geom name="glare_slab" type="box" size="0.675 2.0 0.0006" pos="-2.725 0 0.0206"
+          material="glare" contype="0" conaffinity="0"/>
 
-    <!-- lane markings (no collision) -->
-    <geom name="center_0" type="box" size="0.2 0.015 0.001" pos="0.5 0 0.021" material="paint" contype="0" conaffinity="0"/>
-    <geom name="center_1" type="box" size="0.2 0.015 0.001" pos="1.7 0 0.021" material="paint" contype="0" conaffinity="0"/>
-    <geom name="center_2" type="box" size="0.2 0.015 0.001" pos="2.9 0 0.021" material="paint" contype="0" conaffinity="0"/>
-    <geom name="center_3" type="box" size="0.2 0.015 0.001" pos="4.1 0 0.021" material="paint" contype="0" conaffinity="0"/>
-    <geom name="center_4" type="box" size="0.2 0.015 0.001" pos="7.9 0 0.021" material="paint" contype="0" conaffinity="0"/>
-    <geom name="center_5" type="box" size="0.2 0.015 0.001" pos="9.1 0 0.021" material="paint" contype="0" conaffinity="0"/>
-    <geom name="center_6" type="box" size="0.2 0.015 0.001" pos="10.3 0 0.021" material="paint" contype="0" conaffinity="0"/>
-    <geom name="center_7" type="box" size="0.2 0.015 0.001" pos="14.0 0 0.021" material="paint" contype="0" conaffinity="0"/>
-    <geom name="center_8" type="box" size="0.2 0.015 0.001" pos="15.2 0 0.021" material="paint" contype="0" conaffinity="0"/>
-    <geom name="center_9" type="box" size="0.2 0.015 0.001" pos="16.4 0 0.021" material="paint" contype="0" conaffinity="0"/>
-    <geom name="center_10" type="box" size="0.2 0.015 0.001" pos="25.2 0 0.021" material="paint" contype="0" conaffinity="0"/>
-    <geom name="center_11" type="box" size="0.2 0.015 0.001" pos="26.4 0 0.021" material="paint" contype="0" conaffinity="0"/>
-
-    <!-- stop line before the traffic light -->
-    <geom name="stop_line" type="box" size="0.04 0.8 0.001" pos="5.5 0 0.021" material="paint" contype="0" conaffinity="0"/>
-    <!-- bicycle crossing markings -->
-    <geom name="crossing_a" type="box" size="0.9 0.03 0.001" pos="12 0.55 0.021" material="paint" contype="0" conaffinity="0"/>
-    <geom name="crossing_b" type="box" size="0.9 0.03 0.001" pos="12 0 0.021" material="paint" contype="0" conaffinity="0"/>
-    <geom name="crossing_c" type="box" size="0.9 0.03 0.001" pos="12 -0.55 0.021" material="paint" contype="0" conaffinity="0"/>
-    <!-- finish line -->
-    <geom name="finish_line" type="box" size="0.06 0.8 0.001" pos="28 0 0.021" material="paint" contype="0" conaffinity="0"/>
-
-    <!-- curbs: keep the car on the road; gaps at the bicycle crossing (x 11..13)
-         and where the tunnel walls take over (x 18..24) -->
-    <geom name="curb_l1" type="box" size="6.5 0.05 0.05" pos="4.5 0.85 0.07" material="curb"/>
-    <geom name="curb_r1" type="box" size="6.5 0.05 0.05" pos="4.5 -0.85 0.07" material="curb"/>
-    <geom name="curb_l2" type="box" size="2.5 0.05 0.05" pos="15.5 0.85 0.07" material="curb"/>
-    <geom name="curb_r2" type="box" size="2.5 0.05 0.05" pos="15.5 -0.85 0.07" material="curb"/>
-    <geom name="curb_l3" type="box" size="2.5 0.05 0.05" pos="26.5 0.85 0.07" material="curb"/>
-    <geom name="curb_r3" type="box" size="2.5 0.05 0.05" pos="26.5 -0.85 0.07" material="curb"/>
-
-    <!-- traffic light gantry at x=6, facing the approaching car -->
-    <geom name="pole_l" type="cylinder" size="0.03 0.45" pos="6 0.95 0.45" rgba="0.2 0.2 0.2 1"/>
-    <geom name="pole_r" type="cylinder" size="0.03 0.45" pos="6 -0.95 0.45" rgba="0.2 0.2 0.2 1"/>
-    <geom name="crossbar" type="box" size="0.03 1.0 0.03" pos="6 0 0.9" rgba="0.2 0.2 0.2 1"/>
-    <geom name="light_housing" type="box" size="0.05 0.09 0.17" pos="6 0 0.68" rgba="0.1 0.1 0.1 1"/>
-    <geom name="lamp_red" type="sphere" size="0.045" pos="5.94 0 0.79" rgba="0.3 0.05 0.05 1" contype="0" conaffinity="0"/>
-    <geom name="lamp_yellow" type="sphere" size="0.045" pos="5.94 0 0.68" rgba="0.3 0.25 0.05 1" contype="0" conaffinity="0"/>
-    <geom name="lamp_green" type="sphere" size="0.045" pos="5.94 0 0.57" rgba="0.05 0.3 0.05 1" contype="0" conaffinity="0"/>
-
-    <!-- tunnel: x 18..24, interior width 1.6 m, interior height ~0.6 m -->
-    <geom name="tunnel_wall_l" type="box" size="3 0.05 0.3" pos="21 0.85 0.3" material="tunnel"/>
-    <geom name="tunnel_wall_r" type="box" size="3 0.05 0.3" pos="21 -0.85 0.3" material="tunnel"/>
-    <!-- roof is semi-transparent so spectators can watch the car inside -->
-    <geom name="tunnel_roof" type="box" size="3 0.9 0.02" pos="21 0 0.62" rgba="0.45 0.45 0.5 0.4"/>
-
-    <!-- finish flags -->
-    <geom name="flag_pole_l" type="cylinder" size="0.02 0.4" pos="28 0.95 0.4" rgba="0.8 0.8 0.8 1"/>
-    <geom name="flag_pole_r" type="cylinder" size="0.02 0.4" pos="28 -0.95 0.4" rgba="0.8 0.8 0.8 1"/>
-    <geom name="flag_l" type="box" size="0.12 0.01 0.08" pos="28.12 0.95 0.72" rgba="0.1 0.6 0.1 1" contype="0" conaffinity="0"/>
-    <geom name="flag_r" type="box" size="0.12 0.01 0.08" pos="28.12 -0.95 0.72" rgba="0.1 0.6 0.1 1" contype="0" conaffinity="0"/>
-
-    <!-- bicycle: kinematic (mocap) body moved by env.py; crosses the road at x=12 -->
-    <body name="bicycle" mocap="true" pos="12 -2.2 0.02">
-      <geom name="bike_wheel_f" type="cylinder" size="0.12 0.012" zaxis="1 0 0" pos="0 0.22 0.12"
-            rgba="0.1 0.1 0.1 1" contype="0" conaffinity="0"/>
-      <geom name="bike_wheel_b" type="cylinder" size="0.12 0.012" zaxis="1 0 0" pos="0 -0.22 0.12"
-            rgba="0.1 0.1 0.1 1" contype="0" conaffinity="0"/>
-      <geom name="bike_frame" type="box" size="0.02 0.2 0.02" pos="0 0 0.24" rgba="0.85 0.3 0.1 1"
-            contype="0" conaffinity="0"/>
-      <geom name="bike_rider" type="box" size="0.05 0.09 0.17" pos="0 -0.05 0.43" rgba="0.9 0.7 0.2 1"
-            contype="0" conaffinity="0"/>
-      <geom name="bike_head" type="sphere" size="0.06" pos="0 -0.02 0.66" rgba="0.9 0.75 0.6 1"
-            contype="0" conaffinity="0"/>
-      <!-- single invisible collision box for the whole bicycle -->
-      <geom name="bicycle_hitbox" type="box" size="0.09 0.34 0.36" pos="0 0 0.36" rgba="1 0 0 0" group="4"/>
+    <geom name="line_bottom" type="box" size="2.0 0.0125 0.0007" pos="0 -1.1 0.022" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_top" type="box" size="2.0 0.0125 0.0007" pos="0 1.1 0.022" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r0" type="box" size="0.0328 0.0125 0.0007" pos="2.0288 -1.0996 0.022" euler="0 0 0.0262" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r1" type="box" size="0.0328 0.0125 0.0007" pos="2.0863 -1.0966 0.022" euler="0 0 0.0785" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r2" type="box" size="0.0328 0.0125 0.0007" pos="2.1436 -1.0906 0.022" euler="0 0 0.1309" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r3" type="box" size="0.0328 0.0125 0.0007" pos="2.2005 -1.0816 0.022" euler="0 0 0.1833" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r4" type="box" size="0.0328 0.0125 0.0007" pos="2.2568 -1.0696 0.022" euler="0 0 0.2356" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r5" type="box" size="0.0328 0.0125 0.0007" pos="2.3124 -1.0547 0.022" euler="0 0 0.2880" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r6" type="box" size="0.0328 0.0125 0.0007" pos="2.3672 -1.0369 0.022" euler="0 0 0.3403" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r7" type="box" size="0.0328 0.0125 0.0007" pos="2.4210 -1.0163 0.022" euler="0 0 0.3927" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r8" type="box" size="0.0328 0.0125 0.0007" pos="2.4736 -0.9928 0.022" euler="0 0 0.4451" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r9" type="box" size="0.0328 0.0125 0.0007" pos="2.5249 -0.9667 0.022" euler="0 0 0.4974" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r10" type="box" size="0.0328 0.0125 0.0007" pos="2.5747 -0.9379 0.022" euler="0 0 0.5498" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r11" type="box" size="0.0328 0.0125 0.0007" pos="2.6230 -0.9065 0.022" euler="0 0 0.6021" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r12" type="box" size="0.0328 0.0125 0.0007" pos="2.6696 -0.8727 0.022" euler="0 0 0.6545" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r13" type="box" size="0.0328 0.0125 0.0007" pos="2.7144 -0.8364 0.022" euler="0 0 0.7069" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r14" type="box" size="0.0328 0.0125 0.0007" pos="2.7572 -0.7979 0.022" euler="0 0 0.7592" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r15" type="box" size="0.0328 0.0125 0.0007" pos="2.7979 -0.7572 0.022" euler="0 0 0.8116" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r16" type="box" size="0.0328 0.0125 0.0007" pos="2.8364 -0.7144 0.022" euler="0 0 0.8639" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r17" type="box" size="0.0328 0.0125 0.0007" pos="2.8727 -0.6696 0.022" euler="0 0 0.9163" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r18" type="box" size="0.0328 0.0125 0.0007" pos="2.9065 -0.6230 0.022" euler="0 0 0.9687" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r19" type="box" size="0.0328 0.0125 0.0007" pos="2.9379 -0.5747 0.022" euler="0 0 1.0210" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r20" type="box" size="0.0328 0.0125 0.0007" pos="2.9667 -0.5249 0.022" euler="0 0 1.0734" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r21" type="box" size="0.0328 0.0125 0.0007" pos="2.9928 -0.4736 0.022" euler="0 0 1.1257" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r22" type="box" size="0.0328 0.0125 0.0007" pos="3.0163 -0.4210 0.022" euler="0 0 1.1781" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r23" type="box" size="0.0328 0.0125 0.0007" pos="3.0369 -0.3672 0.022" euler="0 0 1.2305" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r24" type="box" size="0.0328 0.0125 0.0007" pos="3.0547 -0.3124 0.022" euler="0 0 1.2828" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r25" type="box" size="0.0328 0.0125 0.0007" pos="3.0696 -0.2568 0.022" euler="0 0 1.3352" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r26" type="box" size="0.0328 0.0125 0.0007" pos="3.0816 -0.2005 0.022" euler="0 0 1.3875" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r27" type="box" size="0.0328 0.0125 0.0007" pos="3.0906 -0.1436 0.022" euler="0 0 1.4399" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r28" type="box" size="0.0328 0.0125 0.0007" pos="3.0966 -0.0863 0.022" euler="0 0 1.4923" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r29" type="box" size="0.0328 0.0125 0.0007" pos="3.0996 -0.0288 0.022" euler="0 0 1.5446" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r30" type="box" size="0.0328 0.0125 0.0007" pos="3.0996 0.0288 0.022" euler="0 0 1.5970" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r31" type="box" size="0.0328 0.0125 0.0007" pos="3.0966 0.0863 0.022" euler="0 0 1.6493" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r32" type="box" size="0.0328 0.0125 0.0007" pos="3.0906 0.1436 0.022" euler="0 0 1.7017" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r33" type="box" size="0.0328 0.0125 0.0007" pos="3.0816 0.2005 0.022" euler="0 0 1.7541" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r34" type="box" size="0.0328 0.0125 0.0007" pos="3.0696 0.2568 0.022" euler="0 0 1.8064" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r35" type="box" size="0.0328 0.0125 0.0007" pos="3.0547 0.3124 0.022" euler="0 0 1.8588" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r36" type="box" size="0.0328 0.0125 0.0007" pos="3.0369 0.3672 0.022" euler="0 0 1.9111" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r37" type="box" size="0.0328 0.0125 0.0007" pos="3.0163 0.4210 0.022" euler="0 0 1.9635" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r38" type="box" size="0.0328 0.0125 0.0007" pos="2.9928 0.4736 0.022" euler="0 0 2.0159" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r39" type="box" size="0.0328 0.0125 0.0007" pos="2.9667 0.5249 0.022" euler="0 0 2.0682" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r40" type="box" size="0.0328 0.0125 0.0007" pos="2.9379 0.5747 0.022" euler="0 0 2.1206" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r41" type="box" size="0.0328 0.0125 0.0007" pos="2.9065 0.6230 0.022" euler="0 0 2.1729" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r42" type="box" size="0.0328 0.0125 0.0007" pos="2.8727 0.6696 0.022" euler="0 0 2.2253" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r43" type="box" size="0.0328 0.0125 0.0007" pos="2.8364 0.7144 0.022" euler="0 0 2.2777" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r44" type="box" size="0.0328 0.0125 0.0007" pos="2.7979 0.7572 0.022" euler="0 0 2.3300" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r45" type="box" size="0.0328 0.0125 0.0007" pos="2.7572 0.7979 0.022" euler="0 0 2.3824" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r46" type="box" size="0.0328 0.0125 0.0007" pos="2.7144 0.8364 0.022" euler="0 0 2.4347" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r47" type="box" size="0.0328 0.0125 0.0007" pos="2.6696 0.8727 0.022" euler="0 0 2.4871" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r48" type="box" size="0.0328 0.0125 0.0007" pos="2.6230 0.9065 0.022" euler="0 0 2.5395" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r49" type="box" size="0.0328 0.0125 0.0007" pos="2.5747 0.9379 0.022" euler="0 0 2.5918" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r50" type="box" size="0.0328 0.0125 0.0007" pos="2.5249 0.9667 0.022" euler="0 0 2.6442" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r51" type="box" size="0.0328 0.0125 0.0007" pos="2.4736 0.9928 0.022" euler="0 0 2.6965" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r52" type="box" size="0.0328 0.0125 0.0007" pos="2.4210 1.0163 0.022" euler="0 0 2.7489" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r53" type="box" size="0.0328 0.0125 0.0007" pos="2.3672 1.0369 0.022" euler="0 0 2.8013" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r54" type="box" size="0.0328 0.0125 0.0007" pos="2.3124 1.0547 0.022" euler="0 0 2.8536" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r55" type="box" size="0.0328 0.0125 0.0007" pos="2.2568 1.0696 0.022" euler="0 0 2.9060" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r56" type="box" size="0.0328 0.0125 0.0007" pos="2.2005 1.0816 0.022" euler="0 0 2.9583" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r57" type="box" size="0.0328 0.0125 0.0007" pos="2.1436 1.0906 0.022" euler="0 0 3.0107" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r58" type="box" size="0.0328 0.0125 0.0007" pos="2.0863 1.0966 0.022" euler="0 0 3.0631" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_r59" type="box" size="0.0328 0.0125 0.0007" pos="2.0288 1.0996 0.022" euler="0 0 3.1154" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l0" type="box" size="0.0328 0.0125 0.0007" pos="-2.0288 1.0996 0.022" euler="0 0 3.1678" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l1" type="box" size="0.0328 0.0125 0.0007" pos="-2.0863 1.0966 0.022" euler="0 0 3.2201" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l2" type="box" size="0.0328 0.0125 0.0007" pos="-2.1436 1.0906 0.022" euler="0 0 3.2725" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l3" type="box" size="0.0328 0.0125 0.0007" pos="-2.2005 1.0816 0.022" euler="0 0 3.3249" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l4" type="box" size="0.0328 0.0125 0.0007" pos="-2.2568 1.0696 0.022" euler="0 0 3.3772" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l5" type="box" size="0.0328 0.0125 0.0007" pos="-2.3124 1.0547 0.022" euler="0 0 3.4296" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l6" type="box" size="0.0328 0.0125 0.0007" pos="-2.3672 1.0369 0.022" euler="0 0 3.4819" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l7" type="box" size="0.0328 0.0125 0.0007" pos="-2.4210 1.0163 0.022" euler="0 0 3.5343" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l8" type="box" size="0.0328 0.0125 0.0007" pos="-2.4736 0.9928 0.022" euler="0 0 3.5867" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l9" type="box" size="0.0328 0.0125 0.0007" pos="-2.5249 0.9667 0.022" euler="0 0 3.6390" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l10" type="box" size="0.0328 0.0125 0.0007" pos="-2.5747 0.9379 0.022" euler="0 0 3.6914" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l11" type="box" size="0.0328 0.0125 0.0007" pos="-2.6230 0.9065 0.022" euler="0 0 3.7437" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l12" type="box" size="0.0328 0.0125 0.0007" pos="-2.6696 0.8727 0.022" euler="0 0 3.7961" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l13" type="box" size="0.0328 0.0125 0.0007" pos="-2.7144 0.8364 0.022" euler="0 0 3.8485" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l14" type="box" size="0.0328 0.0125 0.0007" pos="-2.7572 0.7979 0.022" euler="0 0 3.9008" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l15" type="box" size="0.0328 0.0125 0.0007" pos="-2.7979 0.7572 0.022" euler="0 0 3.9532" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l16" type="box" size="0.0328 0.0125 0.0007" pos="-2.8364 0.7144 0.022" euler="0 0 4.0055" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l17" type="box" size="0.0328 0.0125 0.0007" pos="-2.8727 0.6696 0.022" euler="0 0 4.0579" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l18" type="box" size="0.0328 0.0125 0.0007" pos="-2.9065 0.6230 0.022" euler="0 0 4.1103" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l19" type="box" size="0.0328 0.0125 0.0007" pos="-2.9379 0.5747 0.022" euler="0 0 4.1626" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l20" type="box" size="0.0328 0.0125 0.0007" pos="-2.9667 0.5249 0.022" euler="0 0 4.2150" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l21" type="box" size="0.0328 0.0125 0.0007" pos="-2.9928 0.4736 0.022" euler="0 0 4.2673" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l22" type="box" size="0.0328 0.0125 0.0007" pos="-3.0163 0.4210 0.022" euler="0 0 4.3197" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l23" type="box" size="0.0328 0.0125 0.0007" pos="-3.0369 0.3672 0.022" euler="0 0 4.3720" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l24" type="box" size="0.0328 0.0125 0.0007" pos="-3.0547 0.3124 0.022" euler="0 0 4.4244" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l25" type="box" size="0.0328 0.0125 0.0007" pos="-3.0696 0.2568 0.022" euler="0 0 4.4768" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l26" type="box" size="0.0328 0.0125 0.0007" pos="-3.0816 0.2005 0.022" euler="0 0 4.5291" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l27" type="box" size="0.0328 0.0125 0.0007" pos="-3.0906 0.1436 0.022" euler="0 0 4.5815" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l28" type="box" size="0.0328 0.0125 0.0007" pos="-3.0966 0.0863 0.022" euler="0 0 4.6338" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l29" type="box" size="0.0328 0.0125 0.0007" pos="-3.0996 0.0288 0.022" euler="0 0 4.6862" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l30" type="box" size="0.0328 0.0125 0.0007" pos="-3.0996 -0.0288 0.022" euler="0 0 4.7386" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l31" type="box" size="0.0328 0.0125 0.0007" pos="-3.0966 -0.0863 0.022" euler="0 0 4.7909" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l32" type="box" size="0.0328 0.0125 0.0007" pos="-3.0906 -0.1436 0.022" euler="0 0 4.8433" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l33" type="box" size="0.0328 0.0125 0.0007" pos="-3.0816 -0.2005 0.022" euler="0 0 4.8956" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l34" type="box" size="0.0328 0.0125 0.0007" pos="-3.0696 -0.2568 0.022" euler="0 0 4.9480" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l35" type="box" size="0.0328 0.0125 0.0007" pos="-3.0547 -0.3124 0.022" euler="0 0 5.0004" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l36" type="box" size="0.0328 0.0125 0.0007" pos="-3.0369 -0.3672 0.022" euler="0 0 5.0527" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l37" type="box" size="0.0328 0.0125 0.0007" pos="-3.0163 -0.4210 0.022" euler="0 0 5.1051" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l38" type="box" size="0.0328 0.0125 0.0007" pos="-2.9928 -0.4736 0.022" euler="0 0 5.1574" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l39" type="box" size="0.0328 0.0125 0.0007" pos="-2.9667 -0.5249 0.022" euler="0 0 5.2098" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l40" type="box" size="0.0328 0.0125 0.0007" pos="-2.9379 -0.5747 0.022" euler="0 0 5.2622" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l41" type="box" size="0.0328 0.0125 0.0007" pos="-2.9065 -0.6230 0.022" euler="0 0 5.3145" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l42" type="box" size="0.0328 0.0125 0.0007" pos="-2.8727 -0.6696 0.022" euler="0 0 5.3669" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l43" type="box" size="0.0328 0.0125 0.0007" pos="-2.8364 -0.7144 0.022" euler="0 0 5.4192" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l44" type="box" size="0.0328 0.0125 0.0007" pos="-2.7979 -0.7572 0.022" euler="0 0 5.4716" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l45" type="box" size="0.0328 0.0125 0.0007" pos="-2.7572 -0.7979 0.022" euler="0 0 5.5240" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l46" type="box" size="0.0328 0.0125 0.0007" pos="-2.7144 -0.8364 0.022" euler="0 0 5.5763" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l47" type="box" size="0.0328 0.0125 0.0007" pos="-2.6696 -0.8727 0.022" euler="0 0 5.6287" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l48" type="box" size="0.0328 0.0125 0.0007" pos="-2.6230 -0.9065 0.022" euler="0 0 5.6810" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l49" type="box" size="0.0328 0.0125 0.0007" pos="-2.5747 -0.9379 0.022" euler="0 0 5.7334" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l50" type="box" size="0.0328 0.0125 0.0007" pos="-2.5249 -0.9667 0.022" euler="0 0 5.7858" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l51" type="box" size="0.0328 0.0125 0.0007" pos="-2.4736 -0.9928 0.022" euler="0 0 5.8381" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l52" type="box" size="0.0328 0.0125 0.0007" pos="-2.4210 -1.0163 0.022" euler="0 0 5.8905" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l53" type="box" size="0.0328 0.0125 0.0007" pos="-2.3672 -1.0369 0.022" euler="0 0 5.9428" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l54" type="box" size="0.0328 0.0125 0.0007" pos="-2.3124 -1.0547 0.022" euler="0 0 5.9952" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l55" type="box" size="0.0328 0.0125 0.0007" pos="-2.2568 -1.0696 0.022" euler="0 0 6.0476" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l56" type="box" size="0.0328 0.0125 0.0007" pos="-2.2005 -1.0816 0.022" euler="0 0 6.0999" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l57" type="box" size="0.0328 0.0125 0.0007" pos="-2.1436 -1.0906 0.022" euler="0 0 6.1523" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l58" type="box" size="0.0328 0.0125 0.0007" pos="-2.0863 -1.0966 0.022" euler="0 0 6.2046" material="line" contype="0" conaffinity="0"/>
+    <geom name="line_l59" type="box" size="0.0328 0.0125 0.0007" pos="-2.0288 -1.0996 0.022" euler="0 0 6.2570" material="line" contype="0" conaffinity="0"/>
+    <geom name="start_line" type="box" size="0.02 0.18 0.0008" pos="-0.3999999999999999 -1.1 0.022199999999999998" material="line" contype="0" conaffinity="0"/>
+    <geom name="choke_wall_l" type="box" size="0.19999999999999996 0.015 0.05" pos="1.5999999999999999 -0.9750000000000001 0.07" rgba="0.55 0.55 0.6 1"/>
+    <geom name="choke_wall_r" type="box" size="0.19999999999999996 0.015 0.05" pos="1.5999999999999999 -1.225 0.07" rgba="0.55 0.55 0.6 1"/>
+    <geom name="tunnel1_wall_l" type="box" size="0.6000000000000005 0.015 0.1" pos="1.3 1.395 0.12" rgba="0.55 0.55 0.6 1"/>
+    <geom name="tunnel1_wall_r" type="box" size="0.6000000000000005 0.015 0.1" pos="1.3 0.8050000000000002 0.12" rgba="0.55 0.55 0.6 1"/>
+    <geom name="tunnel1_roof_l" type="box" size="0.6000000000000005 0.09 0.006" pos="1.3 1.31 0.228" rgba="0.55 0.55 0.6 1"/>
+    <geom name="tunnel1_roof_r" type="box" size="0.6000000000000005 0.09 0.006" pos="1.3 0.8900000000000001 0.228" rgba="0.55 0.55 0.6 1"/>
+    <geom name="tunnel2_wall_l" type="box" size="0.6 0.015 0.1" pos="-1.3 -0.8050000000000002 0.12" rgba="0.55 0.55 0.6 1"/>
+    <geom name="tunnel2_wall_r" type="box" size="0.6 0.015 0.1" pos="-1.3 -1.395 0.12" rgba="0.55 0.55 0.6 1"/>
+    <geom name="tunnel2_roof" type="box" size="0.6 0.31 0.006" pos="-1.3 -1.1 0.228" rgba="0.4 0.4 0.45 1"/>
+    <body name="dyn_obstacle" mocap="true" pos="-0.800 1.100 0.11">
+      <geom name="dyn_obstacle_box" type="box" size="0.06 0.06 0.09" rgba="0.85 0.35 0.1 1"/>
     </body>
-
-    <!-- tunnel obstacle: kinematic (mocap) body; env.py randomizes its side on reset -->
-    <body name="obstacle" mocap="true" pos="21 0.4 0.17">
-      <geom name="obstacle_box" type="box" size="0.2 0.2 0.15" rgba="0.8 0.55 0.1 1"/>
+    <body name="t2_obstacle" mocap="true" pos="-1.300 -0.960 0.09">
+      <geom name="t2_obstacle_box" type="box" size="0.055 0.055 0.07" rgba="0.3 0.55 0.8 1"/>
+    </body>
+    <body name="stop_cube" mocap="true" pos="0 -5 -1">
+      <geom name="stop_cube_box" type="box" size="0.1 0.1 0.1" rgba="0.95 0.95 0.95 1"/>
     </body>
 
     <include file="car.xml"/>
   </worldbody>
 
   <contact>
-    <!-- the car must not collide with its own wheels -->
     <exclude body1="car" body2="fl_wheel"/>
     <exclude body1="car" body2="fr_wheel"/>
     <exclude body1="car" body2="rl_wheel"/>
@@ -125,35 +195,23 @@
   </contact>
 
   <equality>
-    <!-- couple the two steering knuckles so one actuator steers both wheels -->
+    <!-- couple the two steering knuckles so one servo steers both wheels -->
     <joint joint1="fr_steer" joint2="fl_steer" polycoef="0 1 0 0 0"/>
   </equality>
 
   <actuator>
-    <position name="steer" joint="fl_steer" kp="8" forcerange="-4 4" ctrlrange="-0.6 0.6"/>
-    <velocity name="drive_l" joint="rl_roll" kv="0.6" forcerange="-2.5 2.5" ctrlrange="-60 60"/>
-    <velocity name="drive_r" joint="rr_roll" kv="0.6" forcerange="-2.5 2.5" ctrlrange="-60 60"/>
+    <position name="steer" joint="fl_steer" kp="1.5" forcerange="-0.8 0.8" ctrlrange="-0.55 0.55"/>
+    <velocity name="drive_l" joint="rl_roll" kv="0.12" forcerange="-0.3 0.3" ctrlrange="-70 70"/>
+    <velocity name="drive_r" joint="rr_roll" kv="0.12" forcerange="-0.3 0.3" ctrlrange="-70 70"/>
   </actuator>
 
   <sensor>
-    <rangefinder name="rf_0" site="rf_0" cutoff="5"/>
-    <rangefinder name="rf_1" site="rf_1" cutoff="5"/>
-    <rangefinder name="rf_2" site="rf_2" cutoff="5"/>
-    <rangefinder name="rf_3" site="rf_3" cutoff="5"/>
-    <rangefinder name="rf_4" site="rf_4" cutoff="5"/>
-    <rangefinder name="rf_5" site="rf_5" cutoff="5"/>
-    <rangefinder name="rf_6" site="rf_6" cutoff="5"/>
-    <rangefinder name="rf_7" site="rf_7" cutoff="5"/>
-    <rangefinder name="rf_8" site="rf_8" cutoff="5"/>
-    <rangefinder name="rf_9" site="rf_9" cutoff="5"/>
-    <rangefinder name="rf_10" site="rf_10" cutoff="5"/>
     <gyro name="gyro" site="imu"/>
     <accelerometer name="accel" site="imu"/>
-    <velocimeter name="velocity" site="imu"/>
     <jointpos name="steer_angle" joint="fl_steer"/>
     <jointvel name="wheel_speed_l" joint="rl_roll"/>
     <jointvel name="wheel_speed_r" joint="rr_roll"/>
-    <framepos name="car_pos" objtype="body" objname="car"/>
-    <framequat name="car_quat" objtype="body" objname="car"/>
+    <framepos name="car_pos" objtype="xbody" objname="car"/>
+    <framequat name="car_quat" objtype="xbody" objname="car"/>
   </sensor>
 </mujoco>

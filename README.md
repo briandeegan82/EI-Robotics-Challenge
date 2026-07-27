@@ -1,33 +1,35 @@
-# The Gauntlet — Simulation Template
+# The Gauntlet — Line-Following Challenge Simulator
 
-A MuJoCo simulation of the Gauntlet competition course. The real competition
-runs on physical robots — this simulator exists so your team can understand
-the course, prototype control strategies, and practice long before you touch
-hardware. Expect details (dimensions, timings, scoring) to be tuned as the
-official rules are finalized.
+A MuJoCo simulation of the Qualcomm Student Hackathon autonomous vehicle
+line-following challenge. The real competition runs on physical Rubik Pi
+vehicles — this simulator exists so your team can understand the course,
+prototype the vision pipeline and control logic, and practice long before you
+touch hardware.
+
+The track mirrors the official layout: a white line on a dark surface around
+a loop that fits the official 7m × 4m footprint, with every challenge section
+from the guidelines:
 
 ```
- START      TRAFFIC LIGHT       BICYCLE           TUNNEL             FINISH
-  |              |             CROSSING     ┌────────────────┐         |
-  |              ▼                |         │    ┌──┐        │         |
-  ▼         ═════╗════       ← ← ▼ → →      │    │██│obstacle│         ▼
-  ▓         stop ║           ﻿   🚲         │    └──┘        │        ▓
- ─────────────────────────────────────────────────────────────────────────►
-  x=0          x=5.5           x=12        x=18    x=21    x=24      x=28
+                       ┌─ tunnel #1 (lit) ─┐   30
+        ◄──────────────┤███████████████████├───▼─────◄──────────
+      ┌─                 speed section  [dyn obstacle]           ─┐
+  HIGH GLARE                                                    curve
+  (reflective)                                                    │
+      └─   tunnel #2 (dark)                choke ▲│▲              ─┘
+        ───┤███ [obstacle] ███├──┃━►──■───────────┴──────────►
+                              start  stop      lane keeping
+                              /finish cube (after lap)
 ```
 
-The car drives a ~28 m straight road with three challenges:
+Driving order: **start → lane keeping → choke point → curve → tunnel #1 →
+speed section (dynamic obstacle) → high-glare curve → tunnel #2 (obstacle
+inside) → finish → stop cube**.
 
-1. **Traffic light** (x=6): green → yellow → red on a fixed cycle. Crossing
-   the stop line on red costs points.
-2. **Bicycle crossing** (x=12): a cyclist repeatedly crosses the road.
-   Hitting them costs a lot of points — time your approach.
-3. **Tunnel with obstacle** (x=18–24): a box sits on a random side of the
-   lane inside the tunnel. The tunnel fits the car *and* the obstacle —
-   detect which side it's on (rangefinders!) and drive around it.
-
-The run is **fully autonomous**: your code gets sensor readings and returns
-steering + throttle, 50 times per second.
+An attempt, exactly as in the official rules: complete one lap (fastest lap
+of 3 attempts wins), then the white 20 cm stop cube is placed on the track
+and the car must **stop within 10 cm of it without touching it** (30 s
+allowed). Off-track = forfeit; hitting track structure = forfeit.
 
 ## Quickstart
 
@@ -36,19 +38,48 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
 
-# feel the course with your keyboard (arrows, space, backspace)
+# feel the course with your keyboard (arrows; space = stop; backspace = reset)
 python examples/drive_keyboard.py
 
-# watch the reference autonomous controller complete the course
+# watch the reference controller drive a clean lap (uses privileged info)
 python examples/run_example_controller.py
 
-# run it headless (fast, no graphics)
-python examples/run_example_controller.py --headless --seed 3
+# the real thing: camera-based line following
+python examples/vision_line_follower.py
+
+# headless (no graphics window; camera rendering still needs OpenGL)
+MUJOCO_GL=osmesa python examples/vision_line_follower.py --headless --seed 3
 ```
 
-## Writing your controller
+## The rules, in simulation
 
-Copy `examples/example_controller.py` and start editing. The loop looks like:
+Faithful to the official guidelines wherever they can be auto-judged:
+
+- **Primary metric: lap time.** Teams get 3 attempts; the fastest valid lap
+  wins. Run 3 episodes and keep the best — `env.score.result()` reports
+  `lap_time` (or `None` if the attempt was forfeited).
+- **Sensors match the hardware rules.** Camera (primary), IMU, wheel
+  encoders, steering feedback. **Depth sensors are prohibited** at the real
+  event, so the sim has none — obstacle detection must come from the camera.
+- **Vehicle matches the Rubik Pi class**: ~22 × 16 cm, ~1 kg, Ackermann
+  steering, rear-wheel drive, ~2.2 m/s top speed.
+
+| points | event (auto-judged subset of the official tables) |
+|---|---|
+| +5 | dynamic obstacle passed without contact |
+| +5 | tunnel #2 (low light) cleared without contact |
+| +5 | high-glare curve without lane violations |
+| +5 | speed section at >1.5 m/s without losing the line |
+| +10 | stop within 5 cm of the cube, no contact |
+| −2 | minor off-track (wheel on the boundary), per incident |
+| −5 | stalling >2 s |
+| −15 | contact with an obstacle or the stop cube |
+| forfeit | complete loss of track, collision with track structure, flip |
+
+Smoothness/precision bonuses from the official table are judged by humans at
+the event and aren't scored here. Values live in `gauntlet/scoring.py`.
+
+## Writing your controller
 
 ```python
 from gauntlet import GauntletEnv
@@ -63,78 +94,66 @@ while True:
 print(env.score.summary())
 ```
 
-**Action** — 2 floats in [-1, 1]:
+**Action** — 2 floats in [-1, 1]: `[steering (+1 = left), throttle (+1 ≈ 2.2 m/s)]`.
+
+**Observation** — 8 floats, only what the real robot senses on-board:
 
 | index | meaning |
 |---|---|
-| 0 | steering (+1 full left, -1 full right, ±0.6 rad at the wheels) |
-| 1 | throttle (+1 ≈ 3 m/s forward, negative reverses/brakes) |
+| 0 | forward speed from wheel encoders (m/s) |
+| 1–2 | longitudinal / lateral acceleration (m/s², body frame) |
+| 3 | yaw rate (rad/s) |
+| 4 | steering angle (rad) |
+| 5–6 | rear wheel angular velocities (rad/s) |
+| 7 | elapsed time (s) |
 
-**Observation** — 18 floats, matching sensors the real robot will have:
+**Camera** — `env.camera_image()` returns the onboard RGB frame. This is the
+competition's primary sensor: line following, obstacle detection, and ranging
+the stop cube are all meant to be done from it. The course is deliberately
+hostile to naive vision, just like the real event:
 
-| index | meaning |
-|---|---|
-| 0–10 | rangefinder distances (m), fanned right (−60°) to left (+60°), max 5 m |
-| 11–12 | forward / lateral speed (m/s, body frame) |
-| 13 | yaw rate (rad/s) |
-| 14 | steering angle (rad) |
-| 15–16 | rear wheel angular velocities (rad/s) |
-| 17 | elapsed time (s) |
+- the **glare curve** washes the floor out to near-white (fixed thresholds die
+  here — see the median-relative threshold in `vision_line_follower.py`),
+- **tunnel #1** is dim, **tunnel #2** is genuinely dark,
+- both tunnel mouths mix bright and dark content in one frame.
 
-**Camera** — `env.camera_image()` returns the onboard RGB frame
-(320×240×3). That's how the real robot will read the traffic light. On a
-machine without a display run with `MUJOCO_GL=egl` or `MUJOCO_GL=osmesa`.
-
-**`info["privileged"]`** — ground truth (car pose, light state, bicycle
-position, obstacle side) that the real robot will **not** have. Use it to get
-moving on day one, then replace each lookup with perception. The reference
-controller marks exactly where it cheats.
-
-## Scoring
-
-Defined in `gauntlet/scoring.py` (placeholder values until official rules land):
-
-| event | points |
-|---|---|
-| checkpoint passed (light / crossing / tunnel) | +50 each |
-| finish line | +500 |
-| running a red light | −100 |
-| hitting the bicycle | −150 |
-| hitting the tunnel obstacle | −75 |
-| wall / curb strike | −10 each |
-| flipping the car (ends run) | −200 |
-
-Time limit 120 s; ties break on elapsed time. The reference controller scores
-650 (clean run) in ~17–27 s depending on light/bicycle timing.
+**`info["privileged"]`** — ground truth (pose, arc length, lateral offset,
+obstacle positions, cube distance) that the real robot will **not** have.
+Use it to get moving on day one; replace each use with perception before the
+real event. Both examples label exactly where they cheat.
 
 ## Project layout
 
 ```
 gauntlet/
-  env.py           GauntletEnv — reset/step API, course logic (light, bicycle,
-                   obstacle placement), collision & rule detection
-  scoring.py       all scoring rules and point values in one place
+  track.py           track geometry: centerline math, section positions —
+                     shared by the XML generator and the env
+  generate_track.py  writes assets/gauntlet.xml (python -m gauntlet.generate_track)
+  env.py             GauntletEnv — reset/step API, rules enforcement, phases
+  scoring.py         all point values and the attempt result
   assets/
-    gauntlet.xml   the course (road, light, crossing, tunnel, scoring geoms)
-    car.xml        the robot (Ackermann car, camera, IMU, 11-ray rangefinder)
+    gauntlet.xml     the generated course
+    car.xml          the Rubik Pi-class car (camera, IMU, encoders)
 examples/
   drive_keyboard.py          drive manually to learn the course
-  example_controller.py      readable reference autonomous controller
-  run_example_controller.py  runs the reference controller, prints the score
+  example_controller.py      pure-pursuit reference (privileged info; 15/15
+                             clean laps ~10.5 s, max auto-judged points)
+  run_example_controller.py  runs the reference controller
+  vision_line_follower.py    camera-based line following — the real approach
+                             (~18 s laps; obstacle/stop logic still privileged)
 ```
 
 ## Notes for teams
 
-- **Every run differs.** The light phase, bicycle timing, obstacle side, and
-  your exact start position are randomized on `reset()`. Pass a `seed` for
-  reproducible debugging, but test across many seeds — judging will not use
-  your favorite seed.
-- **The env is Gymnasium-shaped** (`reset`/`step` with the standard 5-tuple)
-  but has no Gymnasium dependency. RL teams can wrap it in
-  `gymnasium.Env` in a few lines; `step` already returns a shaped reward
-  (forward progress + scaled scoring events).
-- **Physics runs at 500 Hz, control at 50 Hz** — the same control rate
-  planned for the real robot.
-- **Customizing:** course geometry lives entirely in `gauntlet/assets/*.xml`
-  (positions/sizes in meters), rule timings in the constants at the top of
-  `gauntlet/env.py`, and points in `gauntlet/scoring.py`.
+- **Every attempt differs**: obstacle placement/behaviour (parked on a random
+  side, or crossing the track) and your staging position randomize on
+  `reset()`. The official track layout is only revealed on competition day —
+  don't overfit; `track.py` makes it easy to build variant layouts.
+- **The env is Gymnasium-shaped** (`reset`/`step`, 5-tuple) with no Gymnasium
+  dependency; RL teams can wrap it in a few lines. `step` returns a shaped
+  reward (arc-length progress + scaled scoring events).
+- **Physics at 500 Hz, control at 50 Hz.** Vision at 25 Hz (every other
+  control step) is a realistic processing budget for embedded hardware.
+- **Customizing**: geometry in `gauntlet/track.py` + `generate_track.py`
+  (rerun the generator), rules/timing constants at the top of
+  `gauntlet/env.py`, point values in `gauntlet/scoring.py`.

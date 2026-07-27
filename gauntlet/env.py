@@ -1,4 +1,4 @@
-"""GauntletEnv: the simulation environment for the Gauntlet competition.
+"""GauntletEnv: MuJoCo simulation of the Gauntlet line-following challenge.
 
 The API follows the Gymnasium convention (``reset`` / ``step``) but has no
 dependency on Gymnasium — plain numpy in, numpy out — so it works equally well
@@ -15,33 +15,41 @@ Typical use::
         obs, reward, terminated, truncated, info = env.step(action)
         if terminated or truncated:
             break
-    print(info["score"])
+    print(env.score.summary())
+
+An attempt = one full lap plus the end-zone stop: after the car crosses the
+finish line, the white stop cube is placed on the track and the car must stop
+within 10 cm of it without touching it (30 s allowed), exactly as in the
+official rules.
 
 Action (2 floats, each in [-1, 1]):
-    action[0]  steering: +1 = full left, -1 = full right (max ±0.6 rad)
-    action[1]  throttle: +1 = full speed ahead (~3 m/s), -1 = full reverse
+    action[0]  steering: +1 = full left, -1 = full right (max ±0.55 rad)
+    action[1]  throttle: +1 ≈ 2.2 m/s forward, negative reverses/brakes
 
-Observation (18 floats) — everything the *real* robot could plausibly sense:
-    obs[0:11]  rangefinder distances in meters, right (-60 deg) to left (+60 deg),
-               clipped to 5 m (5.0 = nothing in range)
-    obs[11]    forward speed (m/s, body frame)
-    obs[12]    lateral speed (m/s, body frame)
-    obs[13]    yaw rate (rad/s)
-    obs[14]    steering angle (rad)
-    obs[15]    left rear wheel angular velocity (rad/s)
-    obs[16]    right rear wheel angular velocity (rad/s)
-    obs[17]    elapsed time (s)
+Observation (8 floats) — only what the real robot can sense on-board
+(depth sensors are prohibited by the rules, so there are none):
+    obs[0]  forward speed estimated from wheel encoders (m/s)
+    obs[1]  longitudinal acceleration (m/s^2, body frame)
+    obs[2]  lateral acceleration (m/s^2, body frame)
+    obs[3]  yaw rate (rad/s)
+    obs[4]  steering angle (rad)
+    obs[5]  left rear wheel angular velocity (rad/s)
+    obs[6]  right rear wheel angular velocity (rad/s)
+    obs[7]  elapsed time (s)
+
+The PRIMARY sensor is the camera: ``env.camera_image()`` returns the onboard
+RGB frame — that's what line following, obstacle detection, and the stop cube
+are meant to be driven by.
 
 info dict:
-    info["score"]       current score (see scoring.py)
-    info["events"]      list of scoring events so far
+    info["score"]       current points (see scoring.py)
+    info["events"]      scoring events so far
+    info["phase"]       "lap" or "stop"
+    info["lap_time"]    lap time once the finish line is crossed, else None
     info["privileged"]  ground-truth state the real robot will NOT have
-                        (car pose, light state, bicycle position, obstacle side).
-                        Great for getting started; wean yourself off it before
-                        the real competition.
-
-An onboard camera image is available via ``env.camera_image()`` (requires
-working OpenGL; everything else runs fully headless).
+                        (pose, arc length s, lateral offset, obstacle info,
+                        cube gap). Great for getting started — wean yourself
+                        off it and use the camera before the real competition.
 """
 
 from __future__ import annotations
@@ -51,38 +59,32 @@ from pathlib import Path
 import mujoco
 import numpy as np
 
+from . import track
 from .scoring import ScoreKeeper
 
 _ASSETS = Path(__file__).parent / "assets"
 
-# --- course constants (keep in sync with gauntlet.xml) ---
-STOP_LINE_X = 5.5
-LIGHT_X = 6.0
-CROSSING_X = 12.0
-TUNNEL_X = (18.0, 24.0)
-OBSTACLE_X = 21.0
-FINISH_X = 28.0
-CHECKPOINTS = {"traffic_light": 7.0, "crossing": 13.5, "tunnel": 24.5}
-
-# traffic light cycle (seconds)
-GREEN_S, YELLOW_S, RED_S = 5.0, 2.0, 5.0
-CYCLE_S = GREEN_S + YELLOW_S + RED_S
-
-# bicycle motion: crosses between y=-2.2 and y=+2.2, pausing at each end
-BIKE_SPAN = 2.2
-BIKE_SPEED = 0.8      # m/s
-BIKE_DWELL = 2.0      # s pause at each end
-
-MAX_STEER = 0.6       # rad
-MAX_WHEEL_SPEED = 50  # rad/s  (~3 m/s with 0.06 m wheels)
+MAX_STEER = 0.55       # rad
+MAX_WHEEL_SPEED = 70   # rad/s (~2.2 m/s with 0.032 m wheels)
+WHEEL_RADIUS = 0.032
+CAR_FRONT = 0.115      # front bumper distance from body origin
 CONTROL_HZ = 50
-TIME_LIMIT = 120.0    # s
+LAP_TIME_LIMIT = 120.0   # s to finish the lap
+STOP_TIME_LIMIT = 30.0   # s from finish line to full stop (official rule)
 
-_LAMP_COLORS = {
-    "lamp_red": ((0.3, 0.05, 0.05, 1), (1.0, 0.1, 0.1, 1)),
-    "lamp_yellow": ((0.3, 0.25, 0.05, 1), (1.0, 0.85, 0.1, 1)),
-    "lamp_green": ((0.05, 0.3, 0.05, 1), (0.1, 1.0, 0.15, 1)),
-}
+# dynamic obstacle behaviour (mode chosen randomly each reset)
+DYN_STATIC_LAT = 0.09    # static mode: parked this far off the line
+DYN_MOVE_SPAN = 0.22     # moving mode: slides across +/- this lateral range
+DYN_MOVE_SPEED = 0.12    # m/s
+
+T2_OBSTACLE_LAT = 0.14   # tunnel #2 obstacle offset from the line
+
+# off-track checks are suspended around obstacles (bypassing them requires
+# leaving the line) and during the end-zone stop
+_NO_LANE_CHECK = (
+    (track.DYN_OBSTACLE_S - 0.9, track.DYN_OBSTACLE_S + 0.9),
+    (track.TUNNEL_2[0] - 0.5, track.TUNNEL_2[1] + 0.3),
+)
 
 
 class GauntletEnv:
@@ -99,58 +101,67 @@ class GauntletEnv:
 
         self._frame_skip = int(round(1 / (CONTROL_HZ * self.model.opt.timestep)))
 
-        # cache ids
-        self._sensor = {
-            self.model.sensor(i).name: i for i in range(self.model.nsensor)
-        }
-        self._lamp_geoms = {
-            name: self.model.geom(name).id for name in _LAMP_COLORS
-        }
-        self._bike_mocap = self.model.body("bicycle").mocapid[0]
-        self._obstacle_mocap = self.model.body("obstacle").mocapid[0]
+        self._sensor = {self.model.sensor(i).name: i for i in range(self.model.nsensor)}
         self._car_body = self.model.body("car").id
+        self._dyn_mocap = self.model.body("dyn_obstacle").mocapid[0]
+        self._t2_mocap = self.model.body("t2_obstacle").mocapid[0]
+        self._cube_mocap = self.model.body("stop_cube").mocapid[0]
 
         def gid(name):
             return self.model.geom(name).id
 
-        self._car_geoms = {
-            gid(n) for n in ("chassis", "cabin", "fl_tire", "fr_tire", "rl_tire", "rr_tire")
-        }
-        self._hazard_geoms = {
-            gid("bicycle_hitbox"): "bicycle",
-            gid("obstacle_box"): "obstacle",
-        }
-        for n in ("curb_l1", "curb_r1", "curb_l2", "curb_r2", "curb_l3", "curb_r3",
-                  "tunnel_wall_l", "tunnel_wall_r", "tunnel_roof",
-                  "pole_l", "pole_r", "flag_pole_l", "flag_pole_r"):
-            self._hazard_geoms[gid(n)] = "wall"
+        self._car_geoms = {gid(n) for n in ("chassis", "board", "camera_body",
+                                            "fl_tire", "fr_tire", "rl_tire", "rr_tire")}
+        self._hazard_geoms = {gid("dyn_obstacle_box"): "obstacle",
+                              gid("t2_obstacle_box"): "obstacle",
+                              gid("stop_cube_box"): "cube"}
+        for i in range(self.model.ngeom):
+            name = self.model.geom(i).name
+            if name.startswith(("choke_wall", "tunnel1_", "tunnel2_")):
+                self._hazard_geoms[i] = "wall"
 
         self.reset(seed=0)
 
     # ------------------------------------------------------------------ API
 
     def reset(self, seed: int | None = None):
-        """Reset the course. Returns (obs, info)."""
+        """Reset the attempt. Returns (obs, info)."""
         if seed is not None:
             self._rng = np.random.default_rng(seed)
         mujoco.mj_resetData(self.model, self.data)
 
-        # small random start offset, like an imperfect staging box
-        self.data.qpos[1] = self._rng.uniform(-0.1, 0.1)   # y
-        self.data.qpos[0] = self._rng.uniform(-0.05, 0.05)  # x
+        # staging: within 30 cm of the start line, small placement noise
+        s0 = track.START_S - 0.25
+        x, y, heading = track.path_point(s0)
+        self.data.qpos[0] = x + self._rng.uniform(-0.02, 0.02)
+        self.data.qpos[1] = y + self._rng.uniform(-0.03, 0.03)
 
-        # randomize which side of the tunnel the obstacle is on
-        self.obstacle_side = self._rng.choice([-1, 1])
-        self.data.mocap_pos[self._obstacle_mocap] = [OBSTACLE_X, 0.4 * self.obstacle_side, 0.17]
+        # dynamic obstacle: static on a random side, or slowly crossing
+        self._dyn_moving = bool(self._rng.random() < 0.5)
+        self._dyn_lat0 = float(self._rng.choice([-1, 1]) * DYN_STATIC_LAT)
+        self._dyn_phase = self._rng.uniform(0, 2 * np.pi)
 
-        # random phases so every run is a little different
-        self._light_phase = self._rng.uniform(0, CYCLE_S)
-        self._bike_phase = self._rng.uniform(0, 2 * (2 * BIKE_SPAN / BIKE_SPEED + BIKE_DWELL))
+        # tunnel #2 obstacle: random side of the line
+        self.t2_side = int(self._rng.choice([-1, 1]))
+        ox, oy, _ = track.path_point(track.T2_OBSTACLE_S)
+        self.data.mocap_pos[self._t2_mocap] = [ox, oy + self.t2_side * T2_OBSTACLE_LAT, 0.09]
+
+        # stop cube hidden below the floor until the lap is complete
+        self.data.mocap_pos[self._cube_mocap] = [0, -5, -1]
 
         self.score = ScoreKeeper()
-        self._prev_x = self.data.qpos[0]
-        self._colliding = set()        # hazards in contact last step
-        self._last_collision_t = {}    # hazard -> time of last scored event
+        self.phase = "lap"
+        self.lap_time = None
+        self._progress = 0.0
+        self._prev_s = track.frenet(self.data.qpos[0], self.data.qpos[1])[0]
+        self._off_track = False
+        self._moved = False
+        self._stall_since = None
+        self._stopped_since = None
+        self._colliding = set()
+        self._hit = set()          # hazards already penalized this attempt
+        self._minor_offtrack_s = []
+        self._speed_max_in_speed_section = 0.0
         self._done = False
 
         mujoco.mj_forward(self.model, self.data)
@@ -160,7 +171,7 @@ class GauntletEnv:
     def step(self, action):
         """Advance one control step (1/50 s). Returns (obs, reward, terminated, truncated, info)."""
         if self._done:
-            raise RuntimeError("Episode is over — call reset() first.")
+            raise RuntimeError("Attempt is over — call reset() first.")
         action = np.clip(np.asarray(action, dtype=float), -1, 1)
         self.data.ctrl[0] = action[0] * MAX_STEER
         self.data.ctrl[1] = action[1] * MAX_WHEEL_SPEED
@@ -172,39 +183,92 @@ class GauntletEnv:
             mujoco.mj_step(self.model, self.data)
             step_hazards |= self._contact_hazards()
 
-        # collision events fire once per new contact, with a 1 s cooldown per
-        # hazard so a scraping contact isn't scored dozens of times
+        t = self.data.time
+        x, y = self.data.qpos[0], self.data.qpos[1]
+        s, lat = track.frenet(x, y)
+        ds = np.clip(track.s_delta(s, self._prev_s), -0.5, 0.5)
+        self._progress += ds
+        self._prev_s = s
+        speed = self._obs()[0]
+
+        terminated = truncated = False
+
+        # ---- collisions ------------------------------------------------
         for hazard in step_hazards - self._colliding:
-            if self.data.time - self._last_collision_t.get(hazard, -10) > 1.0:
-                self.score.collision(hazard, self.data.time)
-                self._last_collision_t[hazard] = self.data.time
+            if hazard == "wall":
+                # official rules: collision with track structure forfeits
+                self.score.forfeit("wall_collision", t)
+                terminated = True
+            elif hazard == "obstacle" and "obstacle" not in self._hit:
+                self.score.obstacle_contact(t)
+                self._hit.add("obstacle")
+            elif hazard == "cube":
+                # touching the stop cube ends the attempt (-15, lap time kept)
+                self.score.cube_contact(t)
+                terminated = True
         self._colliding = step_hazards
 
-        x = self.data.qpos[0]
-        t = self.data.time
+        # ---- lane keeping ----------------------------------------------
+        if self.phase == "lap":
+            checked = not any(track.in_range(s, r) for r in _NO_LANE_CHECK)
+            if checked and abs(lat) > track.OFFTRACK_LOST:
+                self.score.forfeit("off_track", t)
+                terminated = True
+            elif checked and abs(lat) > track.OFFTRACK_MINOR and not self._off_track:
+                self.score.off_track_minor(t)
+                self._off_track = True
+                self._minor_offtrack_s.append(s)
+            elif abs(lat) < track.OFFTRACK_MINOR - 0.03:
+                self._off_track = False
 
-        # red light violation: crossing the stop line while the light is red
-        if self._prev_x < STOP_LINE_X <= x and self.light_state == "red":
-            self.score.red_light(t)
+        # ---- stalling (official: hesitation > 2 s) ---------------------
+        if self.phase == "lap":
+            if speed > 0.1:
+                self._moved = True
+                self._stall_since = None
+            elif self._moved and speed < 0.03:
+                if self._stall_since is None:
+                    self._stall_since = t
+                elif t - self._stall_since > 2.0:
+                    self.score.stall(t)
+                    self._stall_since = t  # re-arm; repeated stalls repeat the penalty
+            if track.in_range(s, track.SPEED):
+                self._speed_max_in_speed_section = max(self._speed_max_in_speed_section, speed)
 
-        for name, cx in CHECKPOINTS.items():
-            if self._prev_x < cx <= x:
-                self.score.checkpoint(name, t)
+        # ---- lap completion & the end-zone stop ------------------------
+        if self.phase == "lap" and self._progress >= track.TOTAL + 0.20:
+            self.phase = "stop"
+            self.lap_time = t
+            self.score.lap_complete(t)
+            self._award_lap_bonuses(t)
+            cx, cy, _ = track.path_point(track.CUBE_S)
+            self.data.mocap_pos[self._cube_mocap] = [cx, cy, 0.12]
+        elif self.phase == "stop" and not terminated:
+            gap = self._cube_gap()
+            # judge's view: the car itself must be at rest (encoders can read
+            # zero while the car is still sliding with locked wheels)
+            body_speed = float(np.hypot(self.data.qvel[0], self.data.qvel[1]))
+            if body_speed < 0.02:
+                if self._stopped_since is None:
+                    self._stopped_since = t
+                elif t - self._stopped_since > 0.5:
+                    self.score.stop_result(gap, t)
+                    terminated = True
+            else:
+                self._stopped_since = None
+            if t - self.lap_time > STOP_TIME_LIMIT:
+                self.score.stop_timeout(t)
+                terminated = True
 
-        terminated, truncated = False, False
-        if self._prev_x < FINISH_X <= x:
-            self.score.finish(t)
-            terminated = True
+        # ---- global termination ----------------------------------------
         if self._flipped():
-            self.score.flipped(t)
+            self.score.forfeit("flipped", t)
             terminated = True
-        if t >= TIME_LIMIT:
-            self.score.timeout(t)
+        if self.phase == "lap" and t >= LAP_TIME_LIMIT:
+            self.score.forfeit("lap_timeout", t)
             truncated = True
 
-        # simple shaped reward for RL users: forward progress plus scoring events
-        reward = (x - self._prev_x) + self.score.consume_reward()
-        self._prev_x = x
+        reward = ds + self.score.consume_reward()
         self._done = terminated or truncated
 
         if self.render_mode == "human":
@@ -219,22 +283,21 @@ class GauntletEnv:
             self._viewer = mujoco.viewer.launch_passive(self.model, self.data)
             self._viewer.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
             self._viewer.cam.trackbodyid = self._car_body
-            self._viewer.cam.distance = 3.0
-            self._viewer.cam.elevation = -25
+            self._viewer.cam.distance = 1.6
+            self._viewer.cam.elevation = -30
             self._viewer.cam.azimuth = 180
         if self._viewer.is_running():
             self._viewer.sync()
 
     def camera_image(self, camera: str = "onboard", width: int = 320, height: int = 240):
-        """Return an RGB image (H, W, 3 uint8) from the named camera.
+        """Return an RGB image (H, W, 3 uint8) from the onboard camera.
 
-        Requires OpenGL. On a headless machine set MUJOCO_GL=egl or osmesa.
+        This is the competition's primary sensor. Requires OpenGL; on a
+        headless machine set MUJOCO_GL=egl or osmesa.
         """
         if self._renderer is None:
             self._renderer = mujoco.Renderer(self.model, height=height, width=width)
             self._scene_option = mujoco.MjvOption()
-            # hide the rangefinder debug rays — a real camera wouldn't see them
-            self._scene_option.flags[mujoco.mjtVisFlag.mjVIS_RANGEFINDER] = False
         self._renderer.update_scene(self.data, camera=camera, scene_option=self._scene_option)
         return self._renderer.render()
 
@@ -249,36 +312,35 @@ class GauntletEnv:
     # ------------------------------------------------------- course dynamics
 
     def _update_world(self, t: float):
-        """Advance the scripted parts of the world: traffic light and bicycle."""
-        # traffic light
-        phase = (t + self._light_phase) % CYCLE_S
-        if phase < GREEN_S:
-            self.light_state = "green"
-        elif phase < GREEN_S + YELLOW_S:
-            self.light_state = "yellow"
+        """Move the dynamic obstacle (if in moving mode)."""
+        ox, oy, heading = track.path_point(track.DYN_OBSTACLE_S)
+        if self._dyn_moving:
+            # slides back and forth across the track, sinusoidal
+            period = 4 * DYN_MOVE_SPAN / DYN_MOVE_SPEED
+            lat = DYN_MOVE_SPAN * np.sin(2 * np.pi * t / period + self._dyn_phase)
         else:
-            self.light_state = "red"
-        for name, (dim, bright) in _LAMP_COLORS.items():
-            on = name == f"lamp_{self.light_state}"
-            self.model.geom_rgba[self._lamp_geoms[name]] = bright if on else dim
+            lat = self._dyn_lat0
+        nx, ny = -np.sin(heading), np.cos(heading)   # left normal
+        self._dyn_lat = float(lat)
+        self.data.mocap_pos[self._dyn_mocap] = [ox + nx * lat, oy + ny * lat, 0.11]
 
-        # bicycle: constant-speed crossing with a dwell at each end
-        travel = 2 * BIKE_SPAN / BIKE_SPEED
-        period = 2 * (travel + BIKE_DWELL)
-        p = (t + self._bike_phase) % period
-        if p < travel:                       # heading +y
-            y = -BIKE_SPAN + BIKE_SPEED * p
-        elif p < travel + BIKE_DWELL:        # dwell at +y end
-            y = BIKE_SPAN
-        elif p < 2 * travel + BIKE_DWELL:    # heading -y
-            y = BIKE_SPAN - BIKE_SPEED * (p - travel - BIKE_DWELL)
-        else:                                # dwell at -y end
-            y = -BIKE_SPAN
-        self.data.mocap_pos[self._bike_mocap] = [CROSSING_X, y, 0.02]
-        self._bike_y = y
+    def _award_lap_bonuses(self, t: float):
+        """Official bonus tiers that can be judged automatically."""
+        if "obstacle" not in self._hit:
+            self.score.bonus("obstacle_avoidance", t)
+            self.score.bonus("low_light", t)   # cleared tunnel #2 untouched
+        if not any(track.in_range(s, track.SHINE) for s in self._minor_offtrack_s):
+            self.score.bonus("high_glare", t)
+        if (self._speed_max_in_speed_section > 1.5
+                and not any(track.in_range(s, track.SPEED) for s in self._minor_offtrack_s)):
+            self.score.bonus("speed_section", t)
+
+    def _cube_gap(self) -> float:
+        """Gap (m) between the car's front bumper and the stop cube's face."""
+        s, _ = track.frenet(self.data.qpos[0], self.data.qpos[1])
+        return track.s_delta(track.CUBE_S - 0.1, s) - CAR_FRONT
 
     def _contact_hazards(self):
-        """Names of hazards the car is currently touching."""
         out = set()
         for i in range(self.data.ncon):
             c = self.data.contact[i]
@@ -290,7 +352,6 @@ class GauntletEnv:
         return out
 
     def _flipped(self):
-        # world z component of the car's local z axis
         return self.data.xmat[self._car_body].reshape(3, 3)[2, 2] < 0.2
 
     # -------------------------------------------------------------- readouts
@@ -302,32 +363,38 @@ class GauntletEnv:
         return self.data.sensordata[adr:adr + dim].copy()
 
     def _obs(self):
-        rf = np.array([self._sensordata(f"rf_{i}")[0] for i in range(11)])
-        rf[rf < 0] = 5.0          # -1 means "no hit" -> report max range
-        vel = self._sensordata("velocity")
+        wl = self._sensordata("wheel_speed_l")[0]
+        wr = self._sensordata("wheel_speed_r")[0]
+        accel = self._sensordata("accel")
         gyro = self._sensordata("gyro")
-        return np.concatenate([
-            rf,
-            [vel[0], vel[1], gyro[2]],
-            self._sensordata("steer_angle"),
-            self._sensordata("wheel_speed_l"),
-            self._sensordata("wheel_speed_r"),
-            [self.data.time],
-        ]).astype(np.float32)
+        return np.array([
+            (wl + wr) / 2 * WHEEL_RADIUS,   # encoder-based speed estimate
+            accel[0], accel[1],
+            gyro[2],
+            self._sensordata("steer_angle")[0],
+            wl, wr,
+            self.data.time,
+        ], dtype=np.float32)
 
     def _info(self):
         pos = self._sensordata("car_pos")
         qw, qx, qy, qz = self._sensordata("car_quat")
         yaw = np.arctan2(2 * (qw * qz + qx * qy), 1 - 2 * (qy**2 + qz**2))
+        s, lat = track.frenet(pos[0], pos[1])
         return {
             "score": self.score.total(),
             "events": list(self.score.events),
             "time": self.data.time,
+            "phase": self.phase,
+            "lap_time": self.lap_time,
             "privileged": {
                 "car_pos": pos,
                 "car_yaw": float(yaw),
-                "light_state": self.light_state,
-                "bike_y": float(self._bike_y),
-                "obstacle_side": int(self.obstacle_side),
+                "s": float(s),
+                "lateral": float(lat),
+                "progress": float(self._progress),
+                "dyn_obstacle": {"moving": self._dyn_moving, "lateral": self._dyn_lat},
+                "t2_side": self.t2_side,
+                "cube_gap": self._cube_gap() if self.phase == "stop" else None,
             },
         }

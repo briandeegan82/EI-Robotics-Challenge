@@ -1,8 +1,11 @@
-"""Run the reference controller on the Gauntlet.
+"""Run the reference (privileged-info) controller on the Gauntlet.
 
     python examples/run_example_controller.py             # with viewer
     python examples/run_example_controller.py --headless  # no graphics
     python examples/run_example_controller.py --seed 3
+
+For the camera-based approach the real competition requires, see
+vision_line_follower.py.
 """
 
 import argparse
@@ -41,7 +44,6 @@ def main():
 
     print()
     print(env.score.summary())
-    print(f"Finished in {info['time']:.1f}s with score {info['score']}")
     env.close()
 
 
