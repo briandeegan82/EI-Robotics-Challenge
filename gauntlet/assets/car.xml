@@ -1,0 +1,73 @@
+<!--
+  The Gauntlet robot: an Ackermann-style (car-like) robot.
+
+  Approximates the real competition vehicle: rear-wheel drive, steered front
+  wheels, a forward camera, an IMU, and an 11-ray rangefinder fan.
+  Swap or edit this file to match the final hardware spec.
+
+  Included into gauntlet.xml inside <worldbody>. Its actuators/sensors live in
+  gauntlet.xml so this file stays a pure body description.
+-->
+<mujoco>
+  <body name="car" pos="0 0 0.08">
+    <freejoint name="car_free"/>
+    <site name="imu" pos="0 0 0" size="0.01" rgba="1 0 0 0.5" group="4"/>
+
+    <!-- chassis -->
+    <geom name="chassis" type="box" size="0.21 0.15 0.04" pos="0 0 0.03"
+          mass="3.0" rgba="0.15 0.35 0.75 1"/>
+    <geom name="cabin" type="box" size="0.08 0.10 0.03" pos="-0.03 0 0.10"
+          mass="0.2" rgba="0.2 0.5 0.9 1"/>
+
+    <!-- onboard camera: looks along +x (forward), up is +z -->
+    <camera name="onboard" pos="0.16 0 0.14" xyaxes="0 -1 0  0 0 1" fovy="75"/>
+
+    <!-- rangefinder fan: 11 rays, -60 deg to +60 deg, at bumper height.
+         Each site's +z axis is the ray direction. -->
+    <site name="rf_0"  pos="0.22 0 0.06" zaxis="0.5 -0.86603 0"  size="0.005" rgba="1 1 0 0.4" group="4"/>
+    <site name="rf_1"  pos="0.22 0 0.06" zaxis="0.66913 -0.74314 0" size="0.005" rgba="1 1 0 0.4" group="4"/>
+    <site name="rf_2"  pos="0.22 0 0.06" zaxis="0.80902 -0.58779 0" size="0.005" rgba="1 1 0 0.4" group="4"/>
+    <site name="rf_3"  pos="0.22 0 0.06" zaxis="0.91355 -0.40674 0" size="0.005" rgba="1 1 0 0.4" group="4"/>
+    <site name="rf_4"  pos="0.22 0 0.06" zaxis="0.97815 -0.20791 0" size="0.005" rgba="1 1 0 0.4" group="4"/>
+    <site name="rf_5"  pos="0.22 0 0.06" zaxis="1 0 0"             size="0.005" rgba="1 1 0 0.4" group="4"/>
+    <site name="rf_6"  pos="0.22 0 0.06" zaxis="0.97815 0.20791 0" size="0.005" rgba="1 1 0 0.4" group="4"/>
+    <site name="rf_7"  pos="0.22 0 0.06" zaxis="0.91355 0.40674 0" size="0.005" rgba="1 1 0 0.4" group="4"/>
+    <site name="rf_8"  pos="0.22 0 0.06" zaxis="0.80902 0.58779 0" size="0.005" rgba="1 1 0 0.4" group="4"/>
+    <site name="rf_9"  pos="0.22 0 0.06" zaxis="0.66913 0.74314 0" size="0.005" rgba="1 1 0 0.4" group="4"/>
+    <site name="rf_10" pos="0.22 0 0.06" zaxis="0.5 0.86603 0"     size="0.005" rgba="1 1 0 0.4" group="4"/>
+
+    <!-- front left: steering knuckle + wheel -->
+    <body name="fl_knuckle" pos="0.15 0.17 0">
+      <inertial pos="0 0 0" mass="0.08" diaginertia="1e-4 1e-4 1e-4"/>
+      <joint name="fl_steer" type="hinge" axis="0 0 1" range="-0.6 0.6" damping="0.05"/>
+      <body name="fl_wheel">
+        <joint name="fl_roll" type="hinge" axis="0 1 0" damping="0.005"/>
+        <geom name="fl_tire" type="cylinder" size="0.06 0.02" zaxis="0 1 0"
+              mass="0.15" rgba="0.1 0.1 0.1 1" friction="1.3 0.005 0.0001"/>
+      </body>
+    </body>
+
+    <!-- front right: steering knuckle + wheel -->
+    <body name="fr_knuckle" pos="0.15 -0.17 0">
+      <inertial pos="0 0 0" mass="0.08" diaginertia="1e-4 1e-4 1e-4"/>
+      <joint name="fr_steer" type="hinge" axis="0 0 1" range="-0.6 0.6" damping="0.05"/>
+      <body name="fr_wheel">
+        <joint name="fr_roll" type="hinge" axis="0 1 0" damping="0.005"/>
+        <geom name="fr_tire" type="cylinder" size="0.06 0.02" zaxis="0 1 0"
+              mass="0.15" rgba="0.1 0.1 0.1 1" friction="1.3 0.005 0.0001"/>
+      </body>
+    </body>
+
+    <!-- rear wheels: driven -->
+    <body name="rl_wheel" pos="-0.15 0.17 0">
+      <joint name="rl_roll" type="hinge" axis="0 1 0" damping="0.005"/>
+      <geom name="rl_tire" type="cylinder" size="0.06 0.02" zaxis="0 1 0"
+            mass="0.15" rgba="0.1 0.1 0.1 1" friction="1.3 0.005 0.0001"/>
+    </body>
+    <body name="rr_wheel" pos="-0.15 -0.17 0">
+      <joint name="rr_roll" type="hinge" axis="0 1 0" damping="0.005"/>
+      <geom name="rr_tire" type="cylinder" size="0.06 0.02" zaxis="0 1 0"
+            mass="0.15" rgba="0.1 0.1 0.1 1" friction="1.3 0.005 0.0001"/>
+    </body>
+  </body>
+</mujoco>

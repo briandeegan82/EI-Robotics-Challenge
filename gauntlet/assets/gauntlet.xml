@@ -1,0 +1,159 @@
+<!--
+  The Gauntlet — competition course.
+
+  A straight road (~28 m of driving) with three challenge sections:
+    1. Traffic light at x=6 (stop line at x=5.5). Stop on red.
+    2. Bicycle crossing at x=12. The bicycle crosses the road repeatedly;
+       don't hit it.
+    3. Tunnel from x=18 to x=24 with an obstacle inside at x=21. The tunnel is
+       wide enough for the car AND the obstacle — detect it and drive around.
+  Finish line at x=28.
+
+  All positions/angles are meters/radians. Course logic (light cycling,
+  bicycle motion, obstacle placement, scoring) lives in gauntlet/env.py.
+-->
+<mujoco model="gauntlet">
+  <compiler angle="radian" autolimits="true"/>
+  <option timestep="0.002" integrator="implicitfast"/>
+
+  <visual>
+    <global offwidth="640" offheight="480"/>
+    <headlight diffuse="0.5 0.5 0.5" ambient="0.35 0.35 0.35"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.45 0.65 0.9" rgb2="0.9 0.95 1" width="256" height="256"/>
+    <texture type="2d" name="grass" builtin="checker" rgb1="0.2 0.3 0.18" rgb2="0.22 0.33 0.2"
+             width="512" height="512"/>
+    <material name="grass" texture="grass" texrepeat="12 12" texuniform="true" reflectance="0"/>
+    <material name="asphalt" rgba="0.25 0.25 0.27 1" reflectance="0.05"/>
+    <material name="paint" rgba="0.9 0.9 0.9 1"/>
+    <material name="curb" rgba="0.75 0.3 0.25 1"/>
+    <material name="tunnel" rgba="0.45 0.45 0.5 1"/>
+  </asset>
+
+  <worldbody>
+    <light directional="true" pos="10 -6 12" dir="-0.25 0.3 -0.9" diffuse="0.7 0.7 0.7" castshadow="true"/>
+
+    <!-- ground and road -->
+    <geom name="ground" type="plane" size="0 0 1" material="grass"/>
+    <geom name="road" type="box" size="15.5 0.8 0.01" pos="13.5 0 0.01" material="asphalt"/>
+
+    <!-- lane markings (no collision) -->
+    <geom name="center_0" type="box" size="0.2 0.015 0.001" pos="0.5 0 0.021" material="paint" contype="0" conaffinity="0"/>
+    <geom name="center_1" type="box" size="0.2 0.015 0.001" pos="1.7 0 0.021" material="paint" contype="0" conaffinity="0"/>
+    <geom name="center_2" type="box" size="0.2 0.015 0.001" pos="2.9 0 0.021" material="paint" contype="0" conaffinity="0"/>
+    <geom name="center_3" type="box" size="0.2 0.015 0.001" pos="4.1 0 0.021" material="paint" contype="0" conaffinity="0"/>
+    <geom name="center_4" type="box" size="0.2 0.015 0.001" pos="7.9 0 0.021" material="paint" contype="0" conaffinity="0"/>
+    <geom name="center_5" type="box" size="0.2 0.015 0.001" pos="9.1 0 0.021" material="paint" contype="0" conaffinity="0"/>
+    <geom name="center_6" type="box" size="0.2 0.015 0.001" pos="10.3 0 0.021" material="paint" contype="0" conaffinity="0"/>
+    <geom name="center_7" type="box" size="0.2 0.015 0.001" pos="14.0 0 0.021" material="paint" contype="0" conaffinity="0"/>
+    <geom name="center_8" type="box" size="0.2 0.015 0.001" pos="15.2 0 0.021" material="paint" contype="0" conaffinity="0"/>
+    <geom name="center_9" type="box" size="0.2 0.015 0.001" pos="16.4 0 0.021" material="paint" contype="0" conaffinity="0"/>
+    <geom name="center_10" type="box" size="0.2 0.015 0.001" pos="25.2 0 0.021" material="paint" contype="0" conaffinity="0"/>
+    <geom name="center_11" type="box" size="0.2 0.015 0.001" pos="26.4 0 0.021" material="paint" contype="0" conaffinity="0"/>
+
+    <!-- stop line before the traffic light -->
+    <geom name="stop_line" type="box" size="0.04 0.8 0.001" pos="5.5 0 0.021" material="paint" contype="0" conaffinity="0"/>
+    <!-- bicycle crossing markings -->
+    <geom name="crossing_a" type="box" size="0.9 0.03 0.001" pos="12 0.55 0.021" material="paint" contype="0" conaffinity="0"/>
+    <geom name="crossing_b" type="box" size="0.9 0.03 0.001" pos="12 0 0.021" material="paint" contype="0" conaffinity="0"/>
+    <geom name="crossing_c" type="box" size="0.9 0.03 0.001" pos="12 -0.55 0.021" material="paint" contype="0" conaffinity="0"/>
+    <!-- finish line -->
+    <geom name="finish_line" type="box" size="0.06 0.8 0.001" pos="28 0 0.021" material="paint" contype="0" conaffinity="0"/>
+
+    <!-- curbs: keep the car on the road; gaps at the bicycle crossing (x 11..13)
+         and where the tunnel walls take over (x 18..24) -->
+    <geom name="curb_l1" type="box" size="6.5 0.05 0.05" pos="4.5 0.85 0.07" material="curb"/>
+    <geom name="curb_r1" type="box" size="6.5 0.05 0.05" pos="4.5 -0.85 0.07" material="curb"/>
+    <geom name="curb_l2" type="box" size="2.5 0.05 0.05" pos="15.5 0.85 0.07" material="curb"/>
+    <geom name="curb_r2" type="box" size="2.5 0.05 0.05" pos="15.5 -0.85 0.07" material="curb"/>
+    <geom name="curb_l3" type="box" size="2.5 0.05 0.05" pos="26.5 0.85 0.07" material="curb"/>
+    <geom name="curb_r3" type="box" size="2.5 0.05 0.05" pos="26.5 -0.85 0.07" material="curb"/>
+
+    <!-- traffic light gantry at x=6, facing the approaching car -->
+    <geom name="pole_l" type="cylinder" size="0.03 0.45" pos="6 0.95 0.45" rgba="0.2 0.2 0.2 1"/>
+    <geom name="pole_r" type="cylinder" size="0.03 0.45" pos="6 -0.95 0.45" rgba="0.2 0.2 0.2 1"/>
+    <geom name="crossbar" type="box" size="0.03 1.0 0.03" pos="6 0 0.9" rgba="0.2 0.2 0.2 1"/>
+    <geom name="light_housing" type="box" size="0.05 0.09 0.17" pos="6 0 0.68" rgba="0.1 0.1 0.1 1"/>
+    <geom name="lamp_red" type="sphere" size="0.045" pos="5.94 0 0.79" rgba="0.3 0.05 0.05 1" contype="0" conaffinity="0"/>
+    <geom name="lamp_yellow" type="sphere" size="0.045" pos="5.94 0 0.68" rgba="0.3 0.25 0.05 1" contype="0" conaffinity="0"/>
+    <geom name="lamp_green" type="sphere" size="0.045" pos="5.94 0 0.57" rgba="0.05 0.3 0.05 1" contype="0" conaffinity="0"/>
+
+    <!-- tunnel: x 18..24, interior width 1.6 m, interior height ~0.6 m -->
+    <geom name="tunnel_wall_l" type="box" size="3 0.05 0.3" pos="21 0.85 0.3" material="tunnel"/>
+    <geom name="tunnel_wall_r" type="box" size="3 0.05 0.3" pos="21 -0.85 0.3" material="tunnel"/>
+    <!-- roof is semi-transparent so spectators can watch the car inside -->
+    <geom name="tunnel_roof" type="box" size="3 0.9 0.02" pos="21 0 0.62" rgba="0.45 0.45 0.5 0.4"/>
+
+    <!-- finish flags -->
+    <geom name="flag_pole_l" type="cylinder" size="0.02 0.4" pos="28 0.95 0.4" rgba="0.8 0.8 0.8 1"/>
+    <geom name="flag_pole_r" type="cylinder" size="0.02 0.4" pos="28 -0.95 0.4" rgba="0.8 0.8 0.8 1"/>
+    <geom name="flag_l" type="box" size="0.12 0.01 0.08" pos="28.12 0.95 0.72" rgba="0.1 0.6 0.1 1" contype="0" conaffinity="0"/>
+    <geom name="flag_r" type="box" size="0.12 0.01 0.08" pos="28.12 -0.95 0.72" rgba="0.1 0.6 0.1 1" contype="0" conaffinity="0"/>
+
+    <!-- bicycle: kinematic (mocap) body moved by env.py; crosses the road at x=12 -->
+    <body name="bicycle" mocap="true" pos="12 -2.2 0.02">
+      <geom name="bike_wheel_f" type="cylinder" size="0.12 0.012" zaxis="1 0 0" pos="0 0.22 0.12"
+            rgba="0.1 0.1 0.1 1" contype="0" conaffinity="0"/>
+      <geom name="bike_wheel_b" type="cylinder" size="0.12 0.012" zaxis="1 0 0" pos="0 -0.22 0.12"
+            rgba="0.1 0.1 0.1 1" contype="0" conaffinity="0"/>
+      <geom name="bike_frame" type="box" size="0.02 0.2 0.02" pos="0 0 0.24" rgba="0.85 0.3 0.1 1"
+            contype="0" conaffinity="0"/>
+      <geom name="bike_rider" type="box" size="0.05 0.09 0.17" pos="0 -0.05 0.43" rgba="0.9 0.7 0.2 1"
+            contype="0" conaffinity="0"/>
+      <geom name="bike_head" type="sphere" size="0.06" pos="0 -0.02 0.66" rgba="0.9 0.75 0.6 1"
+            contype="0" conaffinity="0"/>
+      <!-- single invisible collision box for the whole bicycle -->
+      <geom name="bicycle_hitbox" type="box" size="0.09 0.34 0.36" pos="0 0 0.36" rgba="1 0 0 0" group="4"/>
+    </body>
+
+    <!-- tunnel obstacle: kinematic (mocap) body; env.py randomizes its side on reset -->
+    <body name="obstacle" mocap="true" pos="21 0.4 0.17">
+      <geom name="obstacle_box" type="box" size="0.2 0.2 0.15" rgba="0.8 0.55 0.1 1"/>
+    </body>
+
+    <include file="car.xml"/>
+  </worldbody>
+
+  <contact>
+    <!-- the car must not collide with its own wheels -->
+    <exclude body1="car" body2="fl_wheel"/>
+    <exclude body1="car" body2="fr_wheel"/>
+    <exclude body1="car" body2="rl_wheel"/>
+    <exclude body1="car" body2="rr_wheel"/>
+  </contact>
+
+  <equality>
+    <!-- couple the two steering knuckles so one actuator steers both wheels -->
+    <joint joint1="fr_steer" joint2="fl_steer" polycoef="0 1 0 0 0"/>
+  </equality>
+
+  <actuator>
+    <position name="steer" joint="fl_steer" kp="8" forcerange="-4 4" ctrlrange="-0.6 0.6"/>
+    <velocity name="drive_l" joint="rl_roll" kv="0.6" forcerange="-2.5 2.5" ctrlrange="-60 60"/>
+    <velocity name="drive_r" joint="rr_roll" kv="0.6" forcerange="-2.5 2.5" ctrlrange="-60 60"/>
+  </actuator>
+
+  <sensor>
+    <rangefinder name="rf_0" site="rf_0" cutoff="5"/>
+    <rangefinder name="rf_1" site="rf_1" cutoff="5"/>
+    <rangefinder name="rf_2" site="rf_2" cutoff="5"/>
+    <rangefinder name="rf_3" site="rf_3" cutoff="5"/>
+    <rangefinder name="rf_4" site="rf_4" cutoff="5"/>
+    <rangefinder name="rf_5" site="rf_5" cutoff="5"/>
+    <rangefinder name="rf_6" site="rf_6" cutoff="5"/>
+    <rangefinder name="rf_7" site="rf_7" cutoff="5"/>
+    <rangefinder name="rf_8" site="rf_8" cutoff="5"/>
+    <rangefinder name="rf_9" site="rf_9" cutoff="5"/>
+    <rangefinder name="rf_10" site="rf_10" cutoff="5"/>
+    <gyro name="gyro" site="imu"/>
+    <accelerometer name="accel" site="imu"/>
+    <velocimeter name="velocity" site="imu"/>
+    <jointpos name="steer_angle" joint="fl_steer"/>
+    <jointvel name="wheel_speed_l" joint="rl_roll"/>
+    <jointvel name="wheel_speed_r" joint="rr_roll"/>
+    <framepos name="car_pos" objtype="body" objname="car"/>
+    <framequat name="car_quat" objtype="body" objname="car"/>
+  </sensor>
+</mujoco>
