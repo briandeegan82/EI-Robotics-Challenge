@@ -29,11 +29,27 @@ class ExtendedCourseTests(unittest.TestCase):
             self.assertGreaterEqual(self.env.model.geom(name).id, 0)
 
     def test_signal_cycle(self):
+        # Pin the phase to check the 6 s green / 4 s red boundaries directly.
+        self.env._traffic_phase = 0.0
         self.assertEqual(self.env._traffic_light_state(0.0), "green")
         self.assertEqual(self.env._traffic_light_state(5.99), "green")
         self.assertEqual(self.env._traffic_light_state(6.0), "red")
         self.assertEqual(self.env._traffic_light_state(9.99), "red")
         self.assertEqual(self.env._traffic_light_state(10.0), "green")
+
+    def test_signal_phase_randomizes_across_resets(self):
+        phases = set()
+        for seed in range(10):
+            self.env.reset(seed=seed)
+            self.assertTrue(0.0 <= self.env._traffic_phase < 10.0)
+            phases.add(round(self.env._traffic_phase, 6))
+        self.assertGreater(len(phases), 1)
+
+    def test_signal_phase_shifts_the_cycle(self):
+        # A phase offset moves the green->red boundary earlier by that offset.
+        self.env._traffic_phase = 2.0
+        self.assertEqual(self.env._traffic_light_state(3.99), "green")
+        self.assertEqual(self.env._traffic_light_state(4.0), "red")
 
     def test_lap_completion_ends_attempt_immediately(self):
         self.env._progress = track.TOTAL + 0.30
@@ -71,6 +87,7 @@ class ExtendedCourseTests(unittest.TestCase):
 
     def test_crossing_on_red_is_penalized_once(self):
         self.env.reset(seed=0)
+        self.env._traffic_phase = 0.0   # t=7.0 falls in the red window
         before = track.TRAFFIC_STOP_S - 0.05
         after = track.TRAFFIC_STOP_S + 0.05
         x, y, _ = track.path_point(after)

@@ -176,6 +176,12 @@ class ChallengeEnv:
             0.09,
         ]
 
+        # traffic light: randomize where in the green/red cycle the attempt
+        # starts, so the phase the car meets at the stop line varies per run
+        # and can't be memorized from a fixed lap time. Drawn last so it does
+        # not perturb the bicycle/obstacle randomization for a given seed.
+        self._traffic_phase = float(self._rng.uniform(0, TRAFFIC_CYCLE))
+
         self.score = ScoreKeeper()
         self.lap_time = None
         self._progress = 0.0
@@ -359,7 +365,8 @@ class ChallengeEnv:
         self._update_traffic_light(t)
 
     def _traffic_light_state(self, t: float) -> str:
-        return "green" if t % TRAFFIC_CYCLE < TRAFFIC_GREEN_TIME else "red"
+        return ("green" if (t + self._traffic_phase) % TRAFFIC_CYCLE < TRAFFIC_GREEN_TIME
+                else "red")
 
     def _update_traffic_light(self, t: float):
         state = self._traffic_light_state(t)
