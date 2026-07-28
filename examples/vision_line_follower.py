@@ -27,11 +27,11 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from gauntlet import GauntletEnv, track
 
-CAM_W, CAM_H = 160, 120
+CAM_W, CAM_H = 600, 600
 # Only the bottom rows: the floor from ~0.15 to ~0.5 m ahead of the bumper.
 # A taller ROI previews the track further out but is easily fooled at the
 # tunnel mouths, where sunlit walls outshine the line — try it and see.
-ROI_TOP = 85
+ROI_TOP = 425          # ~0.71 of the way down the frame
 BASE_SPEED = 1.1        # m/s
 DARK_SPEED = 0.7        # m/s when the image is too dark to be confident
 MAX_SPEED = 2.2
@@ -70,7 +70,7 @@ class VisionLineFollower:
             self.line_seen = False
             return False
         mask = roi > max(floor + 0.6 * (peak - floor), 30)
-        if mask.sum() < 8:
+        if mask.sum() < 120:            # too few bright pixels to be the line
             self.line_seen = False
             return False
 

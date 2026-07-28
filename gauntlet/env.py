@@ -289,11 +289,14 @@ class GauntletEnv:
         if self._viewer.is_running():
             self._viewer.sync()
 
-    def camera_image(self, camera: str = "onboard", width: int = 320, height: int = 240):
+    def camera_image(self, camera: str = "onboard", width: int = 600, height: int = 600):
         """Return an RGB image (H, W, 3 uint8) from the onboard camera.
 
-        This is the competition's primary sensor. Requires OpenGL; on a
-        headless machine set MUJOCO_GL=egl or osmesa.
+        Defaults to 600x600. This is the competition's primary sensor.
+        Requires OpenGL; on a headless machine set MUJOCO_GL=egl or osmesa.
+
+        Note: the renderer is created once at the first call and reuses that
+        size afterward, so pass the resolution you want on the first call.
         """
         if self._renderer is None:
             self._renderer = mujoco.Renderer(self.model, height=height, width=width)

@@ -15,7 +15,9 @@
   <option timestep="0.002" integrator="implicitfast"/>
 
   <visual>
-    <global offwidth="640" offheight="480"/>
+    <!-- offscreen framebuffer: must be >= the largest render requested.
+         600x600 onboard camera; view_camera.py's chase panel is 800x600. -->
+    <global offwidth="800" offheight="640"/>
     <!-- weak headlight so the tunnels are genuinely dark on camera -->
     <headlight diffuse="0.12 0.12 0.12" ambient="0.22 0.22 0.22"/>
   </visual>

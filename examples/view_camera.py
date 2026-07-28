@@ -7,7 +7,7 @@
 Opens one window with two panels:
 
     LEFT   the onboard camera feed (exactly what the algorithm receives,
-           160x120), scaled up, with the vision pipeline drawn on top:
+           600x600), with the vision pipeline drawn on top:
              * green  = pixels the line detector kept (the mask)
              * yellow = the region of interest it looks at
              * cyan   = the detected line column it steers toward
@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from gauntlet import GauntletEnv
 from vision_line_follower import CAM_H, CAM_W, VisionLineFollower
 
-SCALE = 4                       # camera panel is CAM_W*SCALE x CAM_H*SCALE
+SCALE = 1                       # camera is already 600x600; no upscaling
 PANEL_H = CAM_H * SCALE         # both panels share this height
 
 
