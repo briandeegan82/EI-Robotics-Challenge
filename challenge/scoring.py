@@ -1,22 +1,14 @@
-"""Scoring for the Gauntlet, following the official hackathon guidelines.
+"""Scoring for the EI Robotics Challenge, following the official guidelines.
 
 Primary metric: fastest valid lap time (teams get 3 attempts; run 3 episodes
-and keep the best). Points are secondary and used for tie-breaking.
-
-Implemented from the official tables:
-
-Bonuses (auto-judged subset — smoothness/precision are judged by humans):
-    +5   obstacle avoidance (dynamic bicycle passed without contact)
-    +5   low-light navigation (tunnel #2 cleared without contact)
-    +5   high-glare handling (no lane violations through the glare curve)
-    +5   speed section mastery (>1.5 m/s there without losing the line)
-    +10  stopping accuracy (stop within 5 cm of the cube, no contact)
+and keep the best). At lap completion, each penalty point adds 1 second to
+the recorded lap time (e.g. −5 points → +5 s).
 
 Penalties:
     -2   leaving the track, once per incident until the car returns
     -5   hesitation/stalling more than 2 s
     -10  crossing the traffic-light stop line on red
-    -15  contact with an obstacle or the stop cube
+    -15  contact with an obstacle
 
 Attempt-forfeiting fouls (no lap time recorded):
     collision with track structure, flip, lap timeout
@@ -28,14 +20,13 @@ from dataclasses import dataclass, field
 
 POINTS = {
     "lap_complete": 0,
-    "bonus": 5,
-    "stop_precise": 10,
     "off_track_minor": -2,
     "stall": -5,
     "traffic_light_violation": -10,
     "obstacle_contact": -15,
-    "cube_contact": -15,
 }
+
+SECONDS_PER_PENALTY_POINT = 1.0
 
 
 @dataclass
@@ -45,21 +36,26 @@ class ScoreKeeper:
     events: list = field(default_factory=list)
     forfeited: bool = False
     lap_time: float | None = None
-    stop_gap: float | None = None
+    raw_lap_time: float | None = None
     _pending_reward: float = 0.0
 
     def _add(self, kind: str, t: float, points: int, detail: str = ""):
         self.events.append({"t": round(t, 2), "event": kind, "points": points, "detail": detail})
         self._pending_reward += points / 10
 
+    def penalty_points(self) -> int:
+        """Magnitude of penalty points accrued (non-negative)."""
+        return max(0, -self.total())
+
     # ---- lap ----
     def lap_complete(self, t: float):
-        self.lap_time = t
-        self._add("lap_complete", t, 0, f"lap time {t:.2f}s")
+        """Record finish: add 1 s to lap time for each penalty point."""
+        penalty_s = self.penalty_points() * SECONDS_PER_PENALTY_POINT
+        self.raw_lap_time = t
+        self.lap_time = t + penalty_s
+        detail = f"raw {t:.2f}s + {penalty_s:.0f}s penalties = {self.lap_time:.2f}s"
+        self._add("lap_complete", t, 0, detail)
         self._pending_reward += 5
-
-    def bonus(self, name: str, t: float):
-        self._add("bonus", t, POINTS["bonus"], name)
 
     # ---- penalties ----
     def off_track_minor(self, t: float):
@@ -75,28 +71,12 @@ class ScoreKeeper:
     def obstacle_contact(self, t: float):
         self._add("obstacle_contact", t, POINTS["obstacle_contact"])
 
-    def cube_contact(self, t: float):
-        self._add("cube_contact", t, POINTS["cube_contact"])
-
-    # ---- end-zone stop ----
-    def stop_result(self, gap: float, t: float):
-        """Car has come to rest near the cube; judge the stop."""
-        self.stop_gap = gap
-        if 0 < gap <= 0.05:
-            self._add("stop_precise", t, POINTS["stop_precise"], f"gap {gap * 100:.1f} cm")
-        elif 0 < gap <= 0.10:
-            self._add("stop_ok", t, 0, f"gap {gap * 100:.1f} cm")
-        else:
-            self._add("stop_missed", t, 0, f"gap {gap * 100:.1f} cm (need <= 10 cm)")
-
-    def stop_timeout(self, t: float):
-        self._add("stop_timeout", t, 0, "did not stop within 30 s of finishing")
-
     # ---- forfeits ----
     def forfeit(self, reason: str, t: float):
         """Attempt-forfeiting foul: no lap time is recorded."""
         self.forfeited = True
         self.lap_time = None
+        self.raw_lap_time = None
         self._add("forfeit", t, 0, reason)
         self._pending_reward -= 5
 
@@ -106,21 +86,26 @@ class ScoreKeeper:
 
     def result(self) -> dict:
         """Attempt outcome: lap_time is None if the attempt was forfeited."""
-        return {"lap_time": self.lap_time, "points": self.total(),
-                "valid": self.lap_time is not None, "events": list(self.events)}
+        return {"lap_time": self.lap_time, "raw_lap_time": self.raw_lap_time,
+                "points": self.total(), "valid": self.lap_time is not None,
+                "events": list(self.events)}
 
     def consume_reward(self) -> float:
-        """Reward accumulated since last call (used by GauntletEnv.step)."""
+        """Reward accumulated since last call (used by ChallengeEnv.step)."""
         r, self._pending_reward = self._pending_reward, 0.0
         return r
 
     def summary(self) -> str:
-        lines = ["--- Gauntlet attempt summary ---"]
+        lines = ["--- EI Robotics Challenge attempt summary ---"]
         for e in self.events:
             detail = f" ({e['detail']})" if e["detail"] else ""
-            lines.append(f"  t={e['t']:7.2f}s  {e['event']:<16}{detail:<26} {e['points']:+d}")
+            lines.append(f"  t={e['t']:7.2f}s  {e['event']:<16}{detail:<50} {e['points']:+d}")
         if self.lap_time is not None:
-            lines.append(f"  LAP TIME: {self.lap_time:.2f}s   points: {self.total()}")
+            lines.append(
+                f"  LAP TIME: {self.lap_time:.2f}s"
+                f" (raw {self.raw_lap_time:.2f}s + {self.penalty_points()}s penalties)"
+                f"   points: {self.total()}"
+            )
         else:
             lines.append(f"  NO VALID LAP (forfeited)   points: {self.total()}")
         return "\n".join(lines)

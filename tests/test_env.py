@@ -3,12 +3,12 @@ import unittest
 
 import mujoco
 
-from gauntlet import GauntletEnv, track
+from challenge import ChallengeEnv, track
 
 
 class ExtendedCourseTests(unittest.TestCase):
     def setUp(self):
-        self.env = GauntletEnv()
+        self.env = ChallengeEnv()
 
     def tearDown(self):
         self.env.close()
@@ -34,6 +34,26 @@ class ExtendedCourseTests(unittest.TestCase):
         self.assertEqual(self.env._traffic_light_state(6.0), "red")
         self.assertEqual(self.env._traffic_light_state(9.99), "red")
         self.assertEqual(self.env._traffic_light_state(10.0), "green")
+
+    def test_lap_completion_ends_attempt_immediately(self):
+        self.env._progress = track.TOTAL + 0.30
+        _, _, terminated, truncated, info = self.env.step([0.0, 0.0])
+        self.assertTrue(terminated)
+        self.assertFalse(truncated)
+        self.assertIsNotNone(info["lap_time"])
+        self.assertTrue(any(event["event"] == "lap_complete" for event in info["events"]))
+
+    def test_penalty_points_add_one_second_each_to_lap_time(self):
+        from challenge.scoring import ScoreKeeper
+
+        score = ScoreKeeper()
+        score.off_track_minor(1.0)   # -2
+        score.stall(2.0)             # -5
+        score.lap_complete(40.0)
+        self.assertEqual(score.total(), -7)
+        self.assertEqual(score.raw_lap_time, 40.0)
+        self.assertEqual(score.lap_time, 47.0)
+        self.assertEqual(score.result()["lap_time"], 47.0)
 
     def test_mujoco_default_reset_returns_to_start(self):
         self.env.data.qpos[0:2] = [0.0, 0.0]
@@ -124,7 +144,7 @@ class ExtendedCourseTests(unittest.TestCase):
         pos = self.env.data.mocap_pos[self.env._t2_mocap]
         s, lateral = track.frenet(float(pos[0]), float(pos[1]))
         self.assertAlmostEqual(track.s_delta(s, track.T2_OBSTACLE_S), 0.0, places=6)
-        self.assertAlmostEqual(abs(lateral), 0.09, places=6)
+        self.assertAlmostEqual(abs(lateral), 0.14, places=6)
 
     def test_dynamic_bicycle_is_rotated_across_track(self):
         self.env.reset(seed=0)
@@ -136,6 +156,12 @@ class ExtendedCourseTests(unittest.TestCase):
         )
         error = (actual_yaw - expected_yaw + math.pi) % (2 * math.pi) - math.pi
         self.assertAlmostEqual(error, 0.0, places=6)
+
+    def test_dynamic_bicycle_moves_from_initialization_and_every_reset(self):
+        self.assertTrue(self.env._dyn_moving)
+        for seed in range(10):
+            self.env.reset(seed=seed)
+            self.assertTrue(self.env._dyn_moving)
 
 
 if __name__ == "__main__":

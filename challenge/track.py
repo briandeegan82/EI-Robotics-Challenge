@@ -1,4 +1,4 @@
-"""Arc-length geometry for the diagram-shaped Gauntlet course.
+"""Arc-length geometry for the diagram-shaped EI Robotics Challenge course.
 
 The course is a closed sequence of straight lines and circular corner fillets.
 All consumers use the same ``s`` coordinate, measured in metres in the driving
@@ -25,10 +25,6 @@ CORNER_RADIUS = 0.38
 # Road and vehicle envelope.
 ROAD_HALF_WIDTH = 0.18
 CAR_HALF_WIDTH = 0.082
-CUBE_SCALE = 0.75
-CUBE_HALF_LENGTH = 0.1 * CUBE_SCALE
-CUBE_HALF_WIDTH = ROAD_HALF_WIDTH / 2 * CUBE_SCALE
-CUBE_HALF_HEIGHT = 0.1 * CUBE_SCALE
 OFFTRACK_MINOR = ROAD_HALF_WIDTH - CAR_HALF_WIDTH
 CHOKE_GAP_HALF = 0.15
 
@@ -176,7 +172,7 @@ def _s_at(x: float, y: float) -> float:
 # straight portions so tunnels, stop lines, and obstacle offsets are stable.
 START_S = _s_at(-2.85, 2.35)
 CHOKE = (_s_at(1.25, 2.35), _s_at(1.70, 2.35))
-DYN_OBSTACLE_S = _s_at(0.30, 0.20)
+DYN_OBSTACLE_S = _s_at(0.80, 0.20)
 BICYCLE_YAW_OFFSET = math.pi / 2
 SPEED = (_s_at(1.55, 0.20), _s_at(0.25, 0.20))
 TUNNEL_1 = (_s_at(-0.65, 0.20), _s_at(-1.95, 0.20))
@@ -185,7 +181,6 @@ TUNNEL_2 = (_s_at(0.65, -2.95), _s_at(-0.80, -2.95))
 T2_OBSTACLE_S = _s_at(-0.10, -2.95)
 TRAFFIC_LIGHT_S = _s_at(-4.10, 0.80)
 TRAFFIC_STOP_S = _s_at(-4.10, 0.48)
-CUBE_S = _s_at(-1.85, 2.35)
 
 # Expanded footprint used by the generated floor and overview cameras.
 MIN_X = min(point[0] for point in WAYPOINTS) - 0.7

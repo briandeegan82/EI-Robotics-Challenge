@@ -1,13 +1,11 @@
-# The Gauntlet — Line-Following Challenge Simulator
+# EI Robotics Challenge — Line-Following Simulator
 
-A MuJoCo simulation of the Qualcomm Student Hackathon autonomous vehicle
-line-following challenge. The real competition runs on physical Rubik Pi
-vehicles — this simulator exists so your team can understand the course,
-prototype the vision pipeline and control logic, and practice long before you
-touch hardware.
+A MuJoCo simulation of the **EI Robotics Challenge** autonomous line-following
+course. The real event runs on physical Rubik Pi vehicles; this repo lets teams
+learn the course, prototype vision and control, and practice before hardware day.
 
-The track follows the supplied multi-level course diagram: a paved strip with
-white edges winds through every challenge section in a roughly 9.4 m × 6.7 m
+The track follows the supplied multi-level diagram: a paved strip with white
+edges winds through every challenge section in a roughly 9.4 m × 6.7 m
 simulation footprint:
 
 ```
@@ -23,15 +21,12 @@ simulation footprint:
 
 Driving order: **start → lane keeping → choke → first descent → second turn →
 middle speed straight with the dynamic bicycle halfway along it → tunnel #1 →
-high glare → winding return → tunnel #2 → traffic light → finish → stop
-cube**.
+high glare → winding return → tunnel #2 → traffic light → finish**.
 
-An attempt, exactly as in the official rules: complete one lap (fastest lap
-of 3 attempts wins), then a white 15 cm stop block is placed on one side
-of the track
-and the car must **stop within 10 cm of it without touching it** (30 s
-allowed). Leaving the track costs points until the car returns; hitting track
-structure still forfeits the attempt.
+An attempt ends after one complete lap. Teams get 3 attempts; the fastest valid
+lap wins. Scoring is penalties only — each penalty point adds **1 second** to
+the recorded lap time at the finish. Hitting track structure forfeits the
+attempt.
 
 ## Quickstart
 
@@ -57,41 +52,35 @@ python examples/view_camera.py
 MUJOCO_GL=osmesa python examples/vision_lane_keeper.py --headless --seed 3
 ```
 
-## The rules, in simulation
+## Rules (simulation)
 
 Faithful to the official guidelines wherever they can be auto-judged:
 
-- **Primary metric: lap time.** Teams get 3 attempts; the fastest valid lap
-  wins. Run 3 episodes and keep the best — `env.score.result()` reports
-  `lap_time` (or `None` if the attempt was forfeited).
+- **Primary metric: lap time.** `env.score.result()` reports `lap_time`
+  (or `None` if forfeited). At the finish, **1 s is added per penalty point**
+  (e.g. −10 points → +10 s).
 - **Sensors match the hardware rules.** Camera (primary), IMU, wheel
   encoders, steering feedback. **Depth sensors are prohibited** at the real
   event, so the sim has none — obstacle detection must come from the camera.
 - **Vehicle matches the Rubik Pi class**: ~22 × 16 cm, ~1 kg, Ackermann
   steering, rear-wheel drive, ~2.2 m/s top speed.
 
-| points | event (auto-judged subset of the official tables) |
+| points | event |
 |---|---|
-| +5 | dynamic bicycle passed without contact |
-| +5 | tunnel #2 (low light) cleared without contact |
-| +5 | high-glare curve without lane violations |
-| +5 | speed section at >1.5 m/s without losing the line |
-| +10 | stop within 5 cm of the cube, no contact |
 | −2 | leaving the track, once per incident until the car returns |
 | −5 | stalling >2 s |
 | −10 | crossing the traffic-light stop line on red |
-| −15 | contact with an obstacle or the stop cube |
+| −15 | contact with an obstacle |
 | forfeit | collision with track structure, flip, lap timeout |
 
-Smoothness/precision bonuses from the official table are judged by humans at
-the event and aren't scored here. Values live in `gauntlet/scoring.py`.
+Point values live in `challenge/scoring.py`.
 
 ## Writing your controller
 
 ```python
-from gauntlet import GauntletEnv
+from challenge import ChallengeEnv
 
-env = GauntletEnv(render_mode="human")
+env = ChallengeEnv(render_mode="human")
 obs, info = env.reset(seed=0)
 while True:
     action = my_brain(obs, info)          # -> [steer, throttle] in [-1, 1]
@@ -115,13 +104,12 @@ print(env.score.summary())
 | 7 | elapsed time (s) |
 
 **Camera** — `env.camera_image()` returns the onboard RGB frame. This is the
-competition's primary sensor: line following, obstacle detection, and ranging
-the stop cube are all meant to be done from it. Run
-`python examples/view_camera.py` to *watch* that feed live with the
-line-detection overlay drawn on it (green = detected line pixels, cyan =
-the column the follower steers toward) next to a chase view — the fastest way
-to see why a follower drifts. The course is deliberately hostile to naive
-vision, just like the real event:
+competition's primary sensor for line following and obstacle detection. Run
+`python examples/view_camera.py` to watch that feed live with the
+line-detection overlay (green = detected line pixels, cyan = the column the
+follower steers toward) next to a behind-the-car chase view.
+
+The course is deliberately hostile to naive vision:
 
 - the **glare straight** washes the floor out to near-white (fixed thresholds
   die here — see the adaptive threshold in `vision_lane_keeper.py`),
@@ -130,21 +118,21 @@ vision, just like the real event:
 - the roadside signal follows a 6 s green / 4 s red cycle.
 
 **`info["privileged"]`** — ground truth (pose, arc length, lateral offset,
-obstacle positions, cube distance) that the real robot will **not** have.
-Use it to get moving on day one; replace each use with perception before the
-real event. Both examples label exactly where they cheat.
+obstacle positions) that the real robot will **not** have. Use it to get
+moving on day one; replace each use with perception before the real event.
+Both example controllers label exactly where they cheat.
 
 ## Project layout
 
 ```
-gauntlet/
+challenge/
   track.py           track geometry: centerline math, section positions —
                      shared by the XML generator and the env
-  generate_track.py  writes assets/gauntlet.xml (python -m gauntlet.generate_track)
-  env.py             GauntletEnv — reset/step API, rules enforcement, phases
-  scoring.py         all point values and the attempt result
+  generate_track.py  writes assets/challenge.xml (python -m challenge.generate_track)
+  env.py             ChallengeEnv — reset/step API and rules enforcement
+  scoring.py         penalty values and the attempt result
   assets/
-    gauntlet.xml     the generated course
+    challenge.xml    the generated course
     car.xml          the Rubik Pi-class car (camera, IMU, encoders)
 examples/
   drive_keyboard.py          drive manually to learn the course
@@ -154,19 +142,24 @@ examples/
                              (obstacle/stop/signal logic still privileged)
   view_camera.py             live onboard-camera view with the line-detection
                              overlay + chase view (needs the [viz] extra)
+tests/                       unit tests for track, env, and controllers
 ```
 
 ## Notes for teams
 
-- **Every attempt differs**: obstacle placement/behaviour (parked on a random
-  side, or crossing the track) and your staging position randomize on
-  `reset()`. The official track layout is only revealed on competition day —
-  don't overfit; `track.py` makes it easy to build variant layouts.
+- **Every attempt differs**: obstacle side/crossing phase and your staging
+  position randomize on `reset()`. The official track layout is only revealed
+  on competition day — don't overfit; `track.py` makes it easy to build
+  variant layouts.
 - **The env is Gymnasium-shaped** (`reset`/`step`, 5-tuple) with no Gymnasium
   dependency; RL teams can wrap it in a few lines. `step` returns a shaped
   reward (arc-length progress + scaled scoring events).
 - **Physics at 500 Hz, control at 50 Hz.** Vision at 25 Hz (every other
   control step) is a realistic processing budget for embedded hardware.
-- **Customizing**: geometry in `gauntlet/track.py` + `generate_track.py`
+- **Customizing**: geometry in `challenge/track.py` + `generate_track.py`
   (rerun the generator), rules/timing constants at the top of
-  `gauntlet/env.py`, point values in `gauntlet/scoring.py`.
+  `challenge/env.py`, point values in `challenge/scoring.py`.
+
+## License
+
+This project is released under the [MIT License](LICENSE).

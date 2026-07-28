@@ -1,4 +1,4 @@
-"""Run the reference (privileged-info) controller on the Gauntlet.
+"""Run the reference (privileged-info) controller on the EI Robotics Challenge.
 
     python examples/run_example_controller.py             # with viewer
     python examples/run_example_controller.py --headless  # no graphics
@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from gauntlet import GauntletEnv
+from challenge import ChallengeEnv
 from example_controller import ExampleController
 
 
@@ -25,7 +25,7 @@ def main():
     parser.add_argument("--seed", type=int, default=None, help="course randomization seed")
     args = parser.parse_args()
 
-    env = GauntletEnv(render_mode=None if args.headless else "human")
+    env = ChallengeEnv(render_mode=None if args.headless else "human")
     obs, info = env.reset(seed=args.seed)
     controller = ExampleController()
 

@@ -1,5 +1,5 @@
 <!--
-  The Gauntlet robot, modeled on the Rubik Pi platform:
+  The EI Robotics Challenge robot, modeled on the Rubik Pi platform:
   ~22 x 16 cm, ~1 kg, Ackermann steering, rear-wheel drive.
 
   Sensors match the competition rules: a forward camera (the primary sensor),
@@ -7,7 +7,7 @@
   are PROHIBITED by the rules, so none are modeled — obstacle detection must
   come from the camera.
 
-  Included into gauntlet.xml inside <worldbody>; actuators/sensors live there.
+  Included into challenge.xml inside <worldbody>; actuators/sensors live there.
 -->
 <mujoco>
   <body name="car" pos="0 0 0.052">

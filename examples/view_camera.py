@@ -31,7 +31,7 @@ import mujoco
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from gauntlet import GauntletEnv, track
+from challenge import ChallengeEnv, track
 from vision_lane_keeper import CAM_H, CAM_W, VisionLaneKeeper
 
 SCALE = 1                       # camera is already 800x450; no upscaling
@@ -79,7 +79,6 @@ def draw_overlay(keeper):
 def hud(chase_bgr, info, obs, err):
     p = info["privileged"]
     lines = [
-        f"phase   {info['phase']}",
         f"lap     {p['progress'] / track.TOTAL * 100:5.1f}%",
         f"speed   {obs[0]:4.2f} m/s",
         f"lane err{err:+5.2f}",
@@ -101,7 +100,7 @@ def main():
     parser.add_argument("--record", metavar="FILE", help="also write the window to an .mp4")
     args = parser.parse_args()
 
-    env = GauntletEnv(render_mode=None)
+    env = ChallengeEnv(render_mode=None)
     obs, info = env.reset(seed=args.seed)
     keeper = VisionLaneKeeper(env)
 
@@ -109,10 +108,10 @@ def main():
     chase_cam = mujoco.MjvCamera()
     chase_cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
     chase_cam.trackbodyid = env.model.body("car").id
-    chase_cam.distance, chase_cam.elevation, chase_cam.azimuth = 1.4, -35, 180
+    chase_cam.distance, chase_cam.elevation, chase_cam.azimuth = 1.4, -35, 0
 
     writer = None
-    win = "Gauntlet camera view (q to quit)"
+    win = "EI Robotics Challenge camera view (q to quit)"
     cv2.namedWindow(win, cv2.WINDOW_AUTOSIZE)
 
     i, last_events = 0, 0

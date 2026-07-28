@@ -19,9 +19,9 @@ purpose: the high-glare curve blows the road out toward white, and the dark
 tunnels crush it toward black. Making detection robust there (and reading the
 edge lines directly, rather than the whole road blob) is your project.
 
-Honesty notes (marked CHEAT below): obstacle dodging and the stop-cube
-distance still come from info["privileged"], because doing them from vision
-is real project work, not example code. Replace them with camera logic.
+Honesty note (marked CHEAT below): obstacle dodging still comes from
+info["privileged"], because doing it from vision is real project work, not
+example code. Replace it with camera logic.
 
 Requires OpenGL for offscreen rendering; on a headless machine run with
 MUJOCO_GL=egl or MUJOCO_GL=osmesa.
@@ -35,7 +35,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from gauntlet import GauntletEnv, track
+from challenge import ChallengeEnv, track
 
 CAM_W, CAM_H = 800, 450    # 16:9, Raspberry Pi Camera v3 aspect ratio
 # Only the bottom rows: the floor just ahead of the bumper. Keeping it near
@@ -46,6 +46,10 @@ ROI_TOP = 380          # ~0.84 of the way down the frame
 BASE_SPEED = 1.1        # m/s
 DARK_SPEED = 0.7        # m/s when the road can't be found confidently
 MAX_SPEED = 2.2
+DODGE_RESPONSE = 0.08
+WHEELBASE = 0.15
+MAX_STEER_RAD = 0.55
+DODGE_LOOKAHEAD = 0.35
 
 
 class VisionLaneKeeper:
@@ -61,6 +65,7 @@ class VisionLaneKeeper:
         self.frame = None        # last camera frame (CAM_H, CAM_W, 3)
         self.mask = None         # road pixels within the ROI, or None
         self.cx = None           # detected road-center column, or None
+        self.dodge_bias = 0.0    # smoothed obstacle-avoidance steering bias
 
     def process_frame(self):
         """Update self.err from the camera. Returns True if the road was found."""
@@ -101,6 +106,7 @@ class VisionLaneKeeper:
         s = p["s"]
 
         offset_err = 0.0
+        tunnel_offset = None
         speed = BASE_SPEED
 
         # CHEAT: dodge offsets from privileged info — replace with camera
@@ -108,7 +114,7 @@ class VisionLaneKeeper:
         if track.in_range(s, (track.TUNNEL_2[0] - 0.9, track.TUNNEL_2[1])):
             speed = 0.5                                  # slow for the dark tunnel
         if track.in_range(s, (track.TUNNEL_2[0] + 0.1, track.T2_OBSTACLE_S + 0.35)):
-            offset_err = p["t2_side"] * 0.16             # dodge to the free half,
+            tunnel_offset = -p["t2_side"] * 0.10         # aim for the free half,
             # once inside where the walls are parallel — swerving at the mouth
             # while still yawed from the curve clips the tunnel's leading edge
         dyn = p["dyn_obstacle"]
@@ -116,27 +122,39 @@ class VisionLaneKeeper:
             if dyn["moving"] and abs(dyn["lateral"]) < 0.20:
                 speed = 0.0                              # wait for the gap
             elif not dyn["moving"]:
-                offset_err = np.sign(dyn["lateral"]) * 0.50
+                offset_err = np.sign(dyn["lateral"]) * 0.20
                 speed = 0.6
-
-        # CHEAT: stop-cube range from privileged info — replace with the
-        # cube's apparent size/position in the image.
-        if info["phase"] == "stop":
-            gap = p["cube_gap"]
-            speed = float(np.clip(1.2 * (gap - 0.03), 0.0, 0.6))
-            if gap < 0.048:
-                speed = 0.0
 
         # CHEAT: obey the simulated signal from privileged state.
         light = p["traffic_light"]
         light_gap = track.s_delta(light["stop_s"], s)
-        if info["phase"] == "lap" and light["state"] == "red" and 0 < light_gap < 0.9:
+        if light["state"] == "red" and 0 < light_gap < 0.9:
             speed = min(speed, float(np.clip(1.5 * (light_gap - 0.08), 0.0, 0.6)))
 
         if not self.road_seen:
             speed = min(speed, DARK_SPEED)               # lost the road: ease off
 
-        steer = np.clip(-2.0 * (self.err + offset_err), -1, 1)
+        self.dodge_bias += DODGE_RESPONSE * (offset_err - self.dodge_bias)
+        steer = np.clip(-2.0 * (self.err + self.dodge_bias), -1, 1)
+        if tunnel_offset is not None:
+            # The camera's road estimate is skewed by the dark wall and block.
+            # Since obstacle avoidance already uses privileged information,
+            # pursue a point on the free half instead of adding a steering bias
+            # that can be cancelled by that skewed estimate.
+            tx, ty, target_heading = track.path_point(s + DODGE_LOOKAHEAD)
+            tx += -np.sin(target_heading) * tunnel_offset
+            ty += np.cos(target_heading) * tunnel_offset
+            x, y, _ = p["car_pos"]
+            yaw = p["car_yaw"]
+            dx, dy = tx - x, ty - y
+            local_x = np.cos(yaw) * dx + np.sin(yaw) * dy
+            local_y = -np.sin(yaw) * dx + np.cos(yaw) * dy
+            curvature = 2 * local_y / max(local_x**2 + local_y**2, 1e-6)
+            steer = np.clip(
+                np.arctan(WHEELBASE * curvature) / MAX_STEER_RAD,
+                -1,
+                1,
+            )
         return np.array([steer, speed / MAX_SPEED])
 
 
@@ -146,7 +164,7 @@ def main():
     parser.add_argument("--seed", type=int, default=None)
     args = parser.parse_args()
 
-    env = GauntletEnv(render_mode=None if args.headless else "human")
+    env = ChallengeEnv(render_mode=None if args.headless else "human")
     obs, info = env.reset(seed=args.seed)
     keeper = VisionLaneKeeper(env)
 

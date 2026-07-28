@@ -1,7 +1,7 @@
 import math
 import unittest
 
-from gauntlet import track
+from challenge import track
 
 
 class TrackGeometryTests(unittest.TestCase):
@@ -52,9 +52,9 @@ class TrackGeometryTests(unittest.TestCase):
         for segment in track.SEGMENTS:
             self.assertGreater(segment.length, 0.01)
 
-    def test_dynamic_bicycle_is_midway_along_middle_straight(self):
+    def test_dynamic_bicycle_is_clear_of_first_tunnel(self):
         x, y, heading = track.path_point(track.DYN_OBSTACLE_S)
-        self.assertAlmostEqual(x, 0.30, places=6)
+        self.assertAlmostEqual(x, 0.80, places=6)
         self.assertAlmostEqual(y, 0.20, places=6)
         self.assertAlmostEqual(abs(heading), math.pi, places=6)
 

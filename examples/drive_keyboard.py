@@ -1,4 +1,4 @@
-"""Drive the Gauntlet by hand to get a feel for the course.
+"""Drive the EI Robotics Challenge by hand to get a feel for the course.
 
     python examples/drive_keyboard.py
 
@@ -12,7 +12,7 @@ Controls:
 
 The real competition is fully autonomous — this script is just for building
 intuition about the course, the car's handling, and the challenge sections.
-Drive a full lap and the stop cube appears; try to stop within 10 cm of it.
+The run ends when you complete a full lap.
 """
 
 import sys
@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
 
-from gauntlet import GauntletEnv, track
+from challenge import ChallengeEnv, track
 
 # GLFW key codes used by the MuJoCo viewer
 KEY_RIGHT, KEY_LEFT, KEY_DOWN, KEY_UP = 262, 263, 264, 265
@@ -57,7 +57,7 @@ def main():
     global target_steer, want_reset
     import mujoco.viewer
 
-    env = GauntletEnv()
+    env = ChallengeEnv()
     obs, info = env.reset()
 
     with mujoco.viewer.launch_passive(env.model, env.data, key_callback=on_key) as viewer:
@@ -65,7 +65,7 @@ def main():
         viewer.cam.trackbodyid = env.model.body("car").id
         viewer.cam.distance = 3.0
         viewer.cam.elevation = -25
-        viewer.cam.azimuth = 180
+        viewer.cam.azimuth = 0
 
         last_events, done = 0, False
         while viewer.is_running():
@@ -95,7 +95,7 @@ def main():
 
             p = info["privileged"]
             print(f"\rspeed {obs[0]:5.2f} m/s   lap {p['progress'] / track.TOTAL * 100:5.1f}%   "
-                  f"off-line {p['lateral']:+.2f} m   phase {info['phase']:<5}"
+                  f"off-line {p['lateral']:+.2f} m   "
                   f"signal {p['traffic_light']['state']:<5}   "
                   f"pts {info['score']:4d}   t {info['time']:6.1f}s ", end="")
 

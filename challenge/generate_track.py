@@ -1,6 +1,6 @@
-"""Generate gauntlet/assets/gauntlet.xml from the track geometry in track.py.
+"""Generate challenge/assets/challenge.xml from the track geometry in track.py.
 
-    python -m gauntlet.generate_track
+    python -m challenge.generate_track
 
 Rerun after changing track.py (or the wall/tunnel parameters below). The
 generated XML is committed so teams don't need to run this unless they
@@ -124,7 +124,7 @@ def build() -> str:
     body += tunnel("tunnel1", track.TUNNEL_1, roof="split")
     body += tunnel("tunnel2", track.TUNNEL_2, roof="full")
 
-    # mocap bodies: dynamic obstacle, tunnel #2 obstacle, stop cube.
+    # Mocap bodies: dynamic obstacle and tunnel #2 obstacle.
     # Positions are placeholders — env.py (re)places them every reset.
     dx, dy, bicycle_heading = track.path_point(track.DYN_OBSTACLE_S)
     bicycle_heading += track.BICYCLE_YAW_OFFSET
@@ -149,10 +149,6 @@ def build() -> str:
     ox, oy, _ = track.path_point(track.T2_OBSTACLE_S)
     body.append(f'''<body name="t2_obstacle" mocap="true" pos="{ox:.3f} {oy:.3f} 0.09">
       <geom name="t2_obstacle_box" type="box" size="0.055 0.055 0.07" rgba="0.3 0.55 0.8 1"/>
-    </body>''')
-
-    body.append(f'''<body name="stop_cube" mocap="true" pos="0 -5 -1">
-      <geom name="stop_cube_box" type="box" size="{track.CUBE_HALF_LENGTH:.4f} {track.CUBE_HALF_WIDTH:.4f} {track.CUBE_HALF_HEIGHT:.4f}" rgba="0.95 0.95 0.95 1"/>
     </body>''')
 
     # Roadside traffic signal. The lenses are visual-only collision-wise;
@@ -197,19 +193,18 @@ def build() -> str:
     worldbody = "\n    ".join(body)
 
     return f'''<!--
-  The Gauntlet - lane-keeping competition track (GENERATED FILE).
+  The EI Robotics Challenge - lane-keeping competition track (GENERATED FILE).
 
-  Edit gauntlet/track.py or gauntlet/generate_track.py and rerun
-      python -m gauntlet.generate_track
+  Edit challenge/track.py or challenge/generate_track.py and rerun
+      python -m challenge.generate_track
   instead of editing this file by hand.
 
   Diagram-shaped multi-turn loop. A paved road ~0.36 m wide on dark ground,
   with white edge lines and no center line: the car stays BETWEEN the edges.
   Sections: lane keeping/choke -> dynamic obstacle -> tunnel #1/speed ->
-  glare -> winding return -> tunnel #2 -> traffic light ->
-  finish and end-zone stop.
+  glare -> winding return -> tunnel #2 -> traffic light -> finish.
 -->
-<mujoco model="gauntlet">
+<mujoco model="challenge">
   <compiler angle="radian" autolimits="true"/>
   <option timestep="0.002" integrator="implicitfast"/>
 
@@ -279,7 +274,7 @@ def build() -> str:
 
 
 def main():
-    out = Path(__file__).parent / "assets" / "gauntlet.xml"
+    out = Path(__file__).parent / "assets" / "challenge.xml"
     out.write_text(build())
     print(f"wrote {out}")
 
