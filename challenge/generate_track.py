@@ -2,7 +2,7 @@
 
     python -m challenge.generate_track
 
-Rerun after changing track.py (or the wall/tunnel parameters below). The
+Rerun after changing track.py (or the wall/gate/tunnel parameters below). The
 generated XML is committed so teams don't need to run this unless they
 customize the course.
 """
@@ -20,9 +20,43 @@ ROAD_Z = 0.0206              # paved surface, just above the floor
 EDGE_Z = 0.0212              # edge lines, just above the road
 ROAD_STEP = 0.08             # centerline sweep resolution
 
-WALL = 'rgba="0.55 0.55 0.6 1"'
 # dark (below the road brightness) so it reads as "not road" to the camera
 DARK_WALL = 'rgba="0.13 0.13 0.15 1"'
+CHECKER_BLACK = 'rgba="0.08 0.08 0.08 1"'
+CHECKER_WHITE = 'rgba="0.92 0.92 0.92 1"'
+
+
+def _quat_from_axes(x_axis, y_axis, z_axis) -> tuple[float, float, float, float]:
+    """Return MuJoCo (w, x, y, z) quat for a rotation with the given columns."""
+    xx, xy, xz = x_axis
+    yx, yy, yz = y_axis
+    zx, zy, zz = z_axis
+    trace = xx + yy + zz
+    if trace > 0.0:
+        s = 0.5 / math.sqrt(trace + 1.0)
+        w = 0.25 / s
+        x = (zy - yz) * s
+        y = (xz - zx) * s
+        z = (yx - xy) * s
+    elif xx > yy and xx > zz:
+        s = 2.0 * math.sqrt(1.0 + xx - yy - zz)
+        w = (zy - yz) / s
+        x = 0.25 * s
+        y = (xy + yx) / s
+        z = (xz + zx) / s
+    elif yy > zz:
+        s = 2.0 * math.sqrt(1.0 + yy - xx - zz)
+        w = (xz - zx) / s
+        x = (xy + yx) / s
+        y = 0.25 * s
+        z = (yz + zy) / s
+    else:
+        s = 2.0 * math.sqrt(1.0 + zz - xx - yy)
+        w = (yx - xy) / s
+        x = (xz + zx) / s
+        y = (yz + zy) / s
+        z = 0.25 * s
+    return w, x, y, z
 
 
 def road_and_edges() -> list[str]:
@@ -60,11 +94,8 @@ def road_and_edges() -> list[str]:
     return g
 
 
-def tunnel(name: str, s_range: tuple[float, float], roof: str) -> list[str]:
-    """Tunnel walls (interior width 0.56 m, height 0.22 m) plus a roof.
-
-    roof="full" (dark, tunnel #2) or "split" (center skylight gap, tunnel #1).
-    """
+def tunnel(name: str, s_range: tuple[float, float]) -> list[str]:
+    """Dark tunnel walls (interior width 0.56 m, height 0.22 m) plus a full roof."""
     lo, hi = s_range
     half_len = track.s_delta(hi, lo) / 2
     center_s = lo + half_len
@@ -76,16 +107,56 @@ def tunnel(name: str, s_range: tuple[float, float], roof: str) -> list[str]:
         x, y = x_center + nx * sy * 0.295, y_center + ny * sy * 0.295
         g.append(f'<geom name="{name}_wall_{side}" type="box" '
                  f'size="{half_len} 0.015 0.1" '
-                 f'pos="{x:.4f} {y:.4f} 0.12" {rotation} {WALL}/>')
-    if roof == "full":
-        g.append(f'<geom name="{name}_roof" type="box" size="{half_len} 0.31 0.006" '
-                 f'pos="{x_center:.4f} {y_center:.4f} 0.228" {rotation} {DARK_WALL}/>')
-    else:
-        for side, sy in (("l", 1), ("r", -1)):
-            x, y = x_center + nx * sy * 0.21, y_center + ny * sy * 0.21
-            g.append(f'<geom name="{name}_roof_{side}" type="box" '
-                     f'size="{half_len} 0.09 0.006" '
-                     f'pos="{x:.4f} {y:.4f} 0.228" {rotation} {WALL}/>')
+                 f'pos="{x:.4f} {y:.4f} 0.12" {rotation} {DARK_WALL}/>')
+    g.append(f'<geom name="{name}_roof" type="box" size="{half_len} 0.31 0.006" '
+             f'pos="{x_center:.4f} {y_center:.4f} 0.228" {rotation} {DARK_WALL}/>')
+    return g
+
+
+def checkerboard_gate(name: str, s: float) -> list[str]:
+    """Semicircular checkerboard arch standing over the road at arc-length s."""
+    x0, y0, heading = track.path_point(s)
+    nx, ny = -math.sin(heading), math.cos(heading)
+    tx, ty = math.cos(heading), math.sin(heading)
+
+    r_inner, r_outer = 0.28, 0.36
+    n_theta, n_radial, n_depth = 14, 2, 2
+    depth_pitch = 0.045
+    g = []
+    idx = 0
+    for i in range(n_theta):
+        th = (i + 0.5) * math.pi / n_theta
+        dth = math.pi / n_theta
+        for ri in range(n_radial):
+            radius = r_inner + (ri + 0.5) * (r_outer - r_inner) / n_radial
+            half_r = 0.5 * (r_outer - r_inner) / n_radial + 0.001
+            for di in range(n_depth):
+                depth = (di - 0.5 * (n_depth - 1)) * depth_pitch
+                lat = -radius * math.cos(th)
+                z = radius * math.sin(th)
+                x = x0 + nx * lat + tx * depth
+                y = y0 + ny * lat + ty * depth
+
+                # local x = arc tangent, y = along-track, z = x × y (radial)
+                xa = (nx * math.sin(th), ny * math.sin(th), math.cos(th))
+                ya = (tx, ty, 0.0)
+                za = (
+                    xa[1] * ya[2] - xa[2] * ya[1],
+                    xa[2] * ya[0] - xa[0] * ya[2],
+                    xa[0] * ya[1] - xa[1] * ya[0],
+                )
+                qw, qx, qy, qz = _quat_from_axes(xa, ya, za)
+
+                half_arc = radius * dth / 2 + 0.001
+                half_d = depth_pitch / 2 + 0.001
+                colour = CHECKER_BLACK if (i + ri + di) % 2 == 0 else CHECKER_WHITE
+                g.append(
+                    f'<geom name="{name}_{idx}" type="box" '
+                    f'size="{half_arc:.4f} {half_d:.4f} {half_r:.4f}" '
+                    f'pos="{x:.4f} {y:.4f} {z:.4f}" '
+                    f'quat="{qw:.5f} {qx:.5f} {qy:.5f} {qz:.5f}" {colour}/>'
+                )
+                idx += 1
     return g
 
 
@@ -121,8 +192,8 @@ def build() -> str:
                     f'size="{ch_half} 0.03 0.05" '
                     f'pos="{wx:.4f} {wy:.4f} 0.07" euler="0 0 {ch_heading:.4f}" {DARK_WALL}/>')
 
-    body += tunnel("tunnel1", track.TUNNEL_1, roof="split")
-    body += tunnel("tunnel2", track.TUNNEL_2, roof="full")
+    body += checkerboard_gate("gate", track.GATE_S)
+    body += tunnel("tunnel2", track.TUNNEL_2)
 
     # Mocap bodies: dynamic obstacle and tunnel #2 obstacle.
     # Positions are placeholders — env.py (re)places them every reset.
@@ -183,8 +254,6 @@ def build() -> str:
         f'contype="0" conaffinity="0"/>'
     )
 
-    t1_mid = track.TUNNEL_1[0] + track.s_delta(track.TUNNEL_1[1], track.TUNNEL_1[0]) / 2
-    t1x, t1y, _ = track.path_point(t1_mid)
     floor_cx = (track.MIN_X + track.MAX_X) / 2
     floor_cy = (track.MIN_Y + track.MAX_Y) / 2
     floor_hx = (track.MAX_X - track.MIN_X) / 2
@@ -201,7 +270,7 @@ def build() -> str:
 
   Diagram-shaped multi-turn loop. A paved road ~0.36 m wide on dark ground,
   with white edge lines and no center line: the car stays BETWEEN the edges.
-  Sections: lane keeping/choke -> dynamic obstacle -> tunnel #1/speed ->
+  Sections: lane keeping/choke -> dynamic obstacle -> checkerboard gate/speed ->
   glare -> winding return -> tunnel #2 -> traffic light -> finish.
 -->
 <mujoco model="challenge">
@@ -212,7 +281,7 @@ def build() -> str:
     <!-- offscreen framebuffer: must be >= the largest render requested.
          800x450 onboard camera; view_camera.py's chase panel is 600x450. -->
     <global offwidth="800" offheight="480"/>
-    <!-- weak headlight so the tunnels are genuinely dark on camera -->
+    <!-- weak headlight so the dark tunnel is genuinely dark on camera -->
     <headlight diffuse="0.12 0.12 0.12" ambient="0.22 0.22 0.22"/>
   </visual>
 
@@ -231,7 +300,6 @@ def build() -> str:
 
   <worldbody>
     <light directional="true" pos="3 -4 6" dir="-0.35 0.45 -0.85" diffuse="0.85 0.85 0.8" castshadow="true"/>
-    <light name="tunnel1_light" pos="{t1x:.2f} {t1y:.2f} 0.21" dir="0 0 -1" diffuse="0.45 0.45 0.4" cutoff="70"/>
 
     <geom name="ground" type="plane" size="0 0 1" rgba="0.25 0.32 0.25 1"/>
     <geom name="floor" type="box" size="{floor_hx:.2f} {floor_hy:.2f} 0.01"

@@ -15,9 +15,10 @@ ONLY from the onboard camera. The pipeline here is deliberately simple:
        road centered in front of the car.
 
 It works, but leans on that brightness gap, which the course attacks on
-purpose: the high-glare curve blows the road out toward white, and the dark
-tunnels crush it toward black. Making detection robust there (and reading the
-edge lines directly, rather than the whole road blob) is your project.
+purpose: the high-glare curve blows the road out toward white, the
+checkerboard gate adds high-contrast structure over the road, and the dark
+tunnel crushes it toward black. Making detection robust there (and reading
+the edge lines directly, rather than the whole road blob) is your project.
 
 Honesty note (marked CHEAT below): obstacle dodging still comes from
 info["privileged"], because doing it from vision is real project work, not
@@ -117,13 +118,12 @@ class VisionLaneKeeper:
             tunnel_offset = -p["t2_side"] * 0.10         # aim for the free half,
             # once inside where the walls are parallel — swerving at the mouth
             # while still yawed from the curve clips the tunnel's leading edge
+        # CHEAT: the bicycle continuously crosses the road; wait for a gap
+        # (real robot: detect it with the camera).
         dyn = p["dyn_obstacle"]
         if track.in_range(s, (track.DYN_OBSTACLE_S - 1.0, track.DYN_OBSTACLE_S + 0.45)):
-            if dyn["moving"] and abs(dyn["lateral"]) < 0.20:
+            if abs(dyn["lateral"]) < 0.20:
                 speed = 0.0                              # wait for the gap
-            elif not dyn["moving"]:
-                offset_err = np.sign(dyn["lateral"]) * 0.20
-                speed = 0.6
 
         # CHEAT: obey the simulated signal from privileged state.
         light = p["traffic_light"]

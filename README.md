@@ -12,7 +12,7 @@ simulation footprint:
        start ── lane keeping ── choke ────────────────┐
        ▲                                             │
   traffic light                                      ▼
-       │    tunnel #1 (lit) / speed ◄──────── bicycle ┘
+       │    checkerboard gate / speed ◄────── bicycle ┘
        │
        │    glare ────────────────────────────────┐
        │                                         winding turn
@@ -20,8 +20,8 @@ simulation footprint:
 ```
 
 Driving order: **start → lane keeping → choke → first descent → second turn →
-middle speed straight with the dynamic bicycle halfway along it → tunnel #1 →
-high glare → winding return → tunnel #2 → traffic light → finish**.
+middle speed straight with the dynamic bicycle halfway along it → checkerboard
+gate → high glare → winding return → tunnel #2 → traffic light → finish**.
 
 An attempt ends after one complete lap. Teams get 3 attempts; the fastest valid
 lap wins. Scoring is penalties only — each penalty point adds **1 second** to
@@ -113,8 +113,9 @@ The course is deliberately hostile to naive vision:
 
 - the **glare straight** washes the floor out to near-white (fixed thresholds
   die here — see the adaptive threshold in `vision_lane_keeper.py`),
-- **tunnel #1** is dim, **tunnel #2** is genuinely dark,
-- both tunnel mouths mix bright and dark content in one frame,
+- the **checkerboard gate** adds high-contrast structure over the road,
+- **tunnel #2** is genuinely dark,
+- the tunnel mouth mixes bright and dark content in one frame,
 - the roadside signal follows a 6 s green / 4 s red cycle.
 
 **`info["privileged"]`** — ground truth (pose, arc length, lateral offset,
