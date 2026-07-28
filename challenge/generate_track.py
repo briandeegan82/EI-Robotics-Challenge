@@ -18,7 +18,7 @@ W = track.ROAD_HALF_WIDTH    # paved half-width (car stays between the edges)
 LINE_W = 0.0125              # white edge-line half-width (~25 mm line)
 ROAD_Z = 0.0206              # paved surface, just above the floor
 EDGE_Z = 0.0212              # edge lines, just above the road
-ROAD_STEP = 0.08             # centerline sweep resolution
+ROAD_STEP = 0.02             # arc sweep resolution (finer = smoother curves)
 
 # dark (below the road brightness) so it reads as "not road" to the camera
 DARK_WALL = 'rgba="0.13 0.13 0.15 1"'
@@ -60,7 +60,16 @@ def _quat_from_axes(x_axis, y_axis, z_axis) -> tuple[float, float, float, float]
 
 
 def road_and_edges() -> list[str]:
-    """Sweep the paved strip and edge lines along the shared centerline."""
+    """Sweep the paved strip and edge lines along the shared centerline.
+
+    On a curve a straight box is a chord of the arc, so two things can tear:
+    the paved strip leaves wedges of ground at the outer radius, and the thin
+    edge lines either dash (outer) or fan past the boundary (inner). Both are
+    avoided here without overshooting boxes: a fine ROAD_STEP keeps the road
+    chords hugging the arc, and each edge line is emitted as a proper polyline
+    -- one box per gap between successive boundary points at that line's own
+    radius -- so it stays continuous and on-curve on both sides.
+    """
     g = []
     index = 0
     for segment in track.SEGMENTS:
@@ -71,26 +80,46 @@ def road_and_edges() -> list[str]:
                 if segment.s0 < boundary < segment.s0 + segment.length:
                     cuts.append(boundary)
             cuts.sort()
-        for lo, hi in zip(cuts, cuts[1:]):
+
+        # paved strip: chord boxes centered on the centerline. On a curve these
+        # wide (2*W) boxes overlap heavily near the tight inner radius; if they
+        # were all coplanar the overlaps would z-fight into bright radial moire,
+        # so on arcs each box gets a tiny cycling z-offset (well under
+        # EDGE_Z - ROAD_Z) to make neighbours resolve by draw order instead.
+        # Straight boxes abut without overlapping, so they stay flat at ROAD_Z
+        # (this also keeps the reflective glare straight identical for the
+        # camera pipeline, which is sensitive to specular height steps).
+        for road_i, (lo, hi) in enumerate(zip(cuts, cuts[1:])):
             s = (lo + hi) / 2
             x, y, heading = track.path_point(s)
-            nx, ny = -math.sin(heading), math.cos(heading)
             material = "glare" if track.in_range(s, track.SHINE) else "road"
-            half_len = (hi - lo) / 2 + 0.004
+            road_half = (hi - lo) / 2 + 0.004
+            z = ROAD_Z + (road_i % 6) * 6e-5 if segment.kind == "arc" else ROAD_Z
             g.append(
-                f'<geom name="road_{index}" type="box" size="{half_len:.4f} {W} 0.0006" '
-                f'pos="{x:.4f} {y:.4f} {ROAD_Z}" euler="0 0 {heading:.4f}" '
+                f'<geom name="road_{index}" type="box" size="{road_half:.4f} {W} 0.0006" '
+                f'pos="{x:.4f} {y:.4f} {z:.5f}" euler="0 0 {heading:.4f}" '
                 f'material="{material}" contype="0" conaffinity="0"/>'
             )
-            for side, sign in (("l", 1), ("r", -1)):
-                ex, ey = x + nx * sign * W, y + ny * sign * W
+            index += 1
+
+        # edge lines: a continuous polyline at each boundary radius, built from
+        # chords between the boundary points sampled at every cut
+        for side, sign in (("l", 1), ("r", -1)):
+            points = []
+            for c in cuts:
+                px, py, ph = track.path_point(c)
+                points.append((px - math.sin(ph) * sign * W, py + math.cos(ph) * sign * W))
+            for (ax, ay), (bx, by) in zip(points, points[1:]):
+                mx, my = (ax + bx) / 2, (ay + by) / 2
+                ehead = math.atan2(by - ay, bx - ax)
+                ehalf = math.hypot(bx - ax, by - ay) / 2 + 0.002
                 g.append(
                     f'<geom name="edge_{index}_{side}" type="box" '
-                    f'size="{half_len:.4f} {LINE_W} 0.0004" '
-                    f'pos="{ex:.4f} {ey:.4f} {EDGE_Z}" euler="0 0 {heading:.4f}" '
+                    f'size="{ehalf:.4f} {LINE_W} 0.0004" '
+                    f'pos="{mx:.4f} {my:.4f} {EDGE_Z}" euler="0 0 {ehead:.4f}" '
                     f'material="line" contype="0" conaffinity="0"/>'
                 )
-            index += 1
+                index += 1
     return g
 
 
