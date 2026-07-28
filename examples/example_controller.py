@@ -10,10 +10,10 @@ replace those lookups with perception:
   * obstacle detection    -> camera (depth sensors are prohibited!)
 
 Course plan:
-    1. Pure-pursuit the white line; slow down for the choke point and tunnels.
+    1. Pure-pursuit the white line; slow down for the choke point and gate.
     2. Dodge the tunnel #2 obstacle to the free side.
-    3. Handle the dynamic bicycle: swerve around it if parked, or wait for a
-       gap if it's crossing the track.
+    3. Handle the dynamic bicycle, which continuously crosses the road: hold
+       short of it until a gap opens on the far side, then drive through.
 """
 
 import sys
@@ -28,19 +28,21 @@ WHEELBASE = 0.15
 LOOKAHEAD = 0.35
 CRUISE = 2.0          # m/s on open track
 CHOKE_SPEED = 0.9
-TUNNEL_SPEED = 0.9
+GATE_SPEED = 0.9
 DODGE_SPEED = 0.7
 CURVE_SPEED = 0.8
 MAX_SPEED = 2.2       # matches env throttle mapping
 MAX_STEER = 0.55
 
-DYN_ZONE = (track.DYN_OBSTACLE_S - 1.0, track.DYN_OBSTACLE_S - 0.35)
+DYN_ZONE = (track.DYN_OBSTACLE_S - 1.0, track.DYN_OBSTACLE_S + 0.30)
 OFFSET_RESPONSE = 0.08
 
 
 class ExampleController:
     def __init__(self):
         self.dodge_offset = 0.0
+        self.bike_cleared = False   # latched once we commit to crossing
+        self.prev_bike_lat = 0.0
 
     def act(self, obs, info):
         """Return [steer, throttle], each in [-1, 1]."""
@@ -55,34 +57,47 @@ class ExampleController:
         # --- section speed limits -----------------------------------------
         if track.in_range(s, (track.CHOKE[0] - 0.5, track.CHOKE[1])):
             target_speed = CHOKE_SPEED
-        if track.in_range(s, (track.TUNNEL_1[0] - 0.3, track.TUNNEL_1[1])):
-            target_speed = TUNNEL_SPEED
+        if abs(track.s_delta(s, track.GATE_S)) < 0.8:
+            target_speed = GATE_SPEED
 
         # --- tunnel #2 obstacle: dodge to the free side -------------------
-        # (real robot: detect the box with the camera instead of p["t2_side"])
-        if track.in_range(s, (track.TUNNEL_2[0] - 0.6, track.T2_OBSTACLE_S + 0.35)):
+        # (real robot: detect the box with the camera instead of p["t2_side"]).
+        # Start dodging only inside the lane-check-suspended zone so the swerve
+        # itself never trips an off-track penalty.
+        if track.in_range(s, (track.TUNNEL_2[0] - 0.5, track.T2_OBSTACLE_S + 0.35)):
             offset = -p["t2_side"] * 0.15
             target_speed = DODGE_SPEED
 
-        # --- dynamic bicycle ----------------------------------------------
-        # (real robot: detect it with the camera)
+        # --- dynamic bicycle: it continuously crosses the road ------------
+        # (real robot: detect it with the camera). Hold ~0.45 m short until a
+        # gap opens on the far side and is still widening, then latch a commit
+        # and drive straight through before it swings back.
         dyn = p["dyn_obstacle"]
-        if dyn["moving"]:
-            # crossing obstacle: wait before the zone until it's out of the way
-            if track.in_range(s, DYN_ZONE) and abs(dyn["lateral"]) < 0.20:
+        approach = track.in_range(s, DYN_ZONE)
+        if approach and not self.bike_cleared:
+            moving_out = abs(dyn["lateral"]) > abs(self.prev_bike_lat)
+            if abs(dyn["lateral"]) > 0.19 and moving_out:
+                self.bike_cleared = True
+            else:
                 gap = track.s_delta(track.DYN_OBSTACLE_S - 0.45, s)
-                target_speed = min(target_speed, float(np.clip(2.0 * gap, 0.0, CRUISE)))
-        else:
-            # parked obstacle: swerve around it on the opposite side
-            if track.in_range(s, (track.DYN_OBSTACLE_S - 1.0, track.DYN_OBSTACLE_S + 0.45)):
-                offset = -np.sign(dyn["lateral"]) * 0.13
-                target_speed = min(target_speed, DODGE_SPEED)
+                target_speed = min(target_speed, float(np.clip(1.8 * gap, 0.0, CRUISE)))
+        elif not approach:
+            self.bike_cleared = False           # re-arm once past the obstacle
+        self.prev_bike_lat = dyn["lateral"]
 
         # --- functional traffic light -------------------------------------
+        # Only the current colour is known (no timer), so approach slowly
+        # enough to still honour a late flip to red: brake to a hold on red,
+        # creep on green.
         light = p["traffic_light"]
         light_gap = track.s_delta(light["stop_s"], s)
-        if light["state"] == "red" and 0 < light_gap < 0.9:
-            target_speed = min(target_speed, float(np.clip(1.5 * (light_gap - 0.08), 0.0, 0.8)))
+        if 0 < light_gap < 1.3:
+            if light["state"] == "red":
+                target_speed = min(target_speed, float(np.clip(1.6 * (light_gap - 0.04), 0.0, 0.6)))
+            else:
+                # creep the last stretch so a flip to red right at the line can
+                # still be braked to a stop before crossing it
+                target_speed = min(target_speed, float(np.clip(0.55 * light_gap, 0.12, CRUISE)))
 
         # --- pure pursuit toward a point ahead on the (offset) line -------
         self.dodge_offset += OFFSET_RESPONSE * (offset - self.dodge_offset)

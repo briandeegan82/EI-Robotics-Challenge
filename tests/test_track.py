@@ -38,7 +38,7 @@ class TrackGeometryTests(unittest.TestCase):
             track.CHOKE[0],
             track.SPEED[0],
             track.DYN_OBSTACLE_S,
-            track.TUNNEL_1[0],
+            track.GATE_S,
             track.SHINE[0],
             track.TUNNEL_2[0],
             track.TRAFFIC_STOP_S,
@@ -52,11 +52,12 @@ class TrackGeometryTests(unittest.TestCase):
         for segment in track.SEGMENTS:
             self.assertGreater(segment.length, 0.01)
 
-    def test_dynamic_bicycle_is_clear_of_first_tunnel(self):
+    def test_dynamic_bicycle_is_clear_of_gate(self):
         x, y, heading = track.path_point(track.DYN_OBSTACLE_S)
         self.assertAlmostEqual(x, 0.80, places=6)
         self.assertAlmostEqual(y, 0.20, places=6)
         self.assertAlmostEqual(abs(heading), math.pi, places=6)
+        self.assertGreater(abs(track.s_delta(track.GATE_S, track.DYN_OBSTACLE_S)), 1.0)
 
 
 if __name__ == "__main__":

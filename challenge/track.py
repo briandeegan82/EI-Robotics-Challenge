@@ -169,13 +169,14 @@ def _s_at(x: float, y: float) -> float:
 
 
 # Named features in driving order. Coordinates are deliberately on long,
-# straight portions so tunnels, stop lines, and obstacle offsets are stable.
+# straight portions so the gate, tunnels, stop lines, and obstacle offsets
+# are stable.
 START_S = _s_at(-2.85, 2.35)
 CHOKE = (_s_at(1.25, 2.35), _s_at(1.70, 2.35))
 DYN_OBSTACLE_S = _s_at(0.80, 0.20)
 BICYCLE_YAW_OFFSET = math.pi / 2
 SPEED = (_s_at(1.55, 0.20), _s_at(0.25, 0.20))
-TUNNEL_1 = (_s_at(-0.65, 0.20), _s_at(-1.95, 0.20))
+GATE_S = _s_at(-1.30, 0.20)          # checkerboard semicircle arch
 SHINE = (_s_at(-2.70, -1.35), _s_at(1.60, -1.35))
 TUNNEL_2 = (_s_at(0.65, -2.95), _s_at(-0.80, -2.95))
 T2_OBSTACLE_S = _s_at(-0.10, -2.95)

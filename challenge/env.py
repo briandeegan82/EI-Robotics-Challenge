@@ -137,7 +137,7 @@ class ChallengeEnv:
         }
         for i in range(self.model.ngeom):
             name = self.model.geom(i).name
-            if name.startswith(("choke_wall", "tunnel1_", "tunnel2_")):
+            if name.startswith(("choke_wall", "gate_", "tunnel2_")):
                 self._hazard_geoms[i] = "wall"
 
         self.reset(seed=0)
@@ -253,11 +253,16 @@ class ChallengeEnv:
             self._traffic_light_state(t) == "red"
             and -0.05 < light_gap < 0.8
         )
+        # Suppress the stall penalty across the whole region where a controller
+        # has to hold for the crossing bicycle — it can legitimately come to a
+        # stop anywhere it first sees the bike blocking the road, which is a
+        # wider band than the old [-0.8, -0.2] window. Gated on the bike
+        # actually blocking (|lat| < 0.20) so it can't be abused to sit idle.
         waiting_for_bicycle = (
             self._dyn_moving
             and track.in_range(
                 s,
-                (track.DYN_OBSTACLE_S - 0.8, track.DYN_OBSTACLE_S - 0.2),
+                (track.DYN_OBSTACLE_S - 1.0, track.DYN_OBSTACLE_S + 0.2),
             )
             and abs(self._dyn_lat) < 0.20
         )
@@ -273,7 +278,9 @@ class ChallengeEnv:
                 self.score.stall(t)
                 self._stall_since = t  # re-arm; repeated stalls repeat the penalty
         # ---- lap completion --------------------------------------------
-        if self._progress >= track.TOTAL + 0.20:
+        # Staging sits 0.25 m behind START_S, so a full loop of travel back to
+        # the painted start/finish line is exactly TOTAL + 0.25 of progress.
+        if self._progress >= track.TOTAL + 0.25:
             self.score.lap_complete(t)
             self.lap_time = self.score.lap_time
             terminated = True

@@ -23,7 +23,7 @@ class ExtendedCourseTests(unittest.TestCase):
             "traffic_red",
             "traffic_green",
             "traffic_stop_line",
-            "tunnel1_roof_l",
+            "gate_0",
             "tunnel2_roof",
         ):
             self.assertGreaterEqual(self.env.model.geom(name).id, 0)
