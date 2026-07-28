@@ -5,7 +5,7 @@
     python examples/run_example_controller.py --seed 3
 
 For the camera-based approach the real competition requires, see
-vision_line_follower.py.
+vision_lane_keeper.py.
 """
 
 import argparse

@@ -1,6 +1,6 @@
-"""Watch what the onboard camera sees — with the line-detection overlay.
+"""Watch what the onboard camera sees — with the road-detection overlay.
 
-    python examples/view_camera.py                 # vision follower drives
+    python examples/view_camera.py                 # lane keeper drives
     python examples/view_camera.py --seed 3
     python examples/view_camera.py --record run.mp4 # also save the window to a file
 
@@ -8,15 +8,15 @@ Opens one window with two panels:
 
     LEFT   the onboard camera feed (exactly what the algorithm receives,
            800x450), with the vision pipeline drawn on top:
-             * green  = pixels the line detector kept (the mask)
+             * green  = pixels kept as road (the mask)
              * yellow = the region of interest it looks at
-             * cyan   = the detected line column it steers toward
+             * cyan   = the road-center column it steers toward
              * white  = image center (zero-error reference)
     RIGHT  a third-person chase view of the car on the track.
 
-This is the tool to reach for when your follower drifts off the line: the
-overlay shows *why* — e.g. the mask goes empty in the dark tunnel, or the
-glare floor lights up as if it were line. Press q or Esc to quit.
+This is the tool to reach for when the car drifts toward an edge: the overlay
+shows *why* — e.g. the road mask collapses in the dark tunnel, or the glare
+curve blooms the whole strip toward white. Press q or Esc to quit.
 
 Requires OpenCV (pip install -e ".[viz]") and, on a headless machine,
 MUJOCO_GL=egl or MUJOCO_GL=osmesa for the offscreen rendering.
@@ -31,28 +31,28 @@ import mujoco
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from gauntlet import GauntletEnv
-from vision_line_follower import CAM_H, CAM_W, VisionLineFollower
+from gauntlet import GauntletEnv, track
+from vision_lane_keeper import CAM_H, CAM_W, VisionLaneKeeper
 
 SCALE = 1                       # camera is already 800x450; no upscaling
 PANEL_H = CAM_H * SCALE         # both panels share this height
 
 
-def draw_overlay(follower):
+def draw_overlay(keeper):
     """Return a BGR image of the camera frame with the pipeline drawn on it."""
-    frame = follower.frame
+    frame = keeper.frame
     if frame is None:
         return np.zeros((PANEL_H, CAM_W * SCALE, 3), np.uint8)
 
     img = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR).astype(np.float32)
-    roi_top, roi_bot = follower.ROI
+    roi_top, roi_bot = keeper.ROI
 
-    # tint the detected line pixels green
-    if follower.mask is not None:
+    # tint the detected road pixels green
+    if keeper.mask is not None:
         band = img[roi_top:roi_bot]
         green = np.zeros_like(band)
         green[..., 1] = 255
-        m = follower.mask[..., None]
+        m = keeper.mask[..., None]
         img[roi_top:roi_bot] = np.where(m, 0.45 * band + 0.55 * green, band)
 
     img = cv2.resize(img.astype(np.uint8), (CAM_W * SCALE, CAM_H * SCALE),
@@ -63,13 +63,13 @@ def draw_overlay(follower):
     # image center = zero-error reference (white)
     cx0 = CAM_W * SCALE // 2
     cv2.line(img, (cx0, roi_top * SCALE), (cx0, roi_bot * SCALE), (255, 255, 255), 1)
-    # detected line column (cyan)
-    if follower.cx is not None:
-        cx = int(follower.cx * SCALE)
+    # detected road-center column (cyan)
+    if keeper.cx is not None:
+        cx = int(keeper.cx * SCALE)
         cv2.line(img, (cx, roi_top * SCALE), (cx, roi_bot * SCALE), (255, 255, 0), 2)
 
-    status = "LINE" if follower.line_seen else "NO LINE"
-    color = (120, 255, 120) if follower.line_seen else (80, 80, 255)
+    status = "ROAD" if keeper.road_seen else "NO ROAD"
+    color = (120, 255, 120) if keeper.road_seen else (80, 80, 255)
     cv2.putText(img, status, (8, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
     cv2.putText(img, "onboard camera", (8, PANEL_H - 12),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
@@ -80,9 +80,10 @@ def hud(chase_bgr, info, obs, err):
     p = info["privileged"]
     lines = [
         f"phase   {info['phase']}",
-        f"lap     {p['progress'] / 14.91 * 100:5.1f}%",
+        f"lap     {p['progress'] / track.TOTAL * 100:5.1f}%",
         f"speed   {obs[0]:4.2f} m/s",
-        f"line err{err:+5.2f}",
+        f"lane err{err:+5.2f}",
+        f"signal  {p['traffic_light']['state']}",
         f"points  {info['score']}",
         f"time    {info['time']:5.1f}s",
     ]
@@ -102,7 +103,7 @@ def main():
 
     env = GauntletEnv(render_mode=None)
     obs, info = env.reset(seed=args.seed)
-    follower = VisionLineFollower(env)
+    keeper = VisionLaneKeeper(env)
 
     chase = mujoco.Renderer(env.model, height=PANEL_H, width=int(PANEL_H * 4 / 3))
     chase_cam = mujoco.MjvCamera()
@@ -118,16 +119,16 @@ def main():
     term = trunc = False
     while True:
         if i % 2 == 0:                         # vision at 25 Hz
-            follower.process_frame()
+            keeper.process_frame()
         if not (term or trunc):
-            obs, _, term, trunc, info = env.step(follower.act(obs, info))
+            obs, _, term, trunc, info = env.step(keeper.act(obs, info))
             for e in info["events"][last_events:]:
                 print(f"[t={e['t']:6.2f}s] {e['event']} {e['detail']} ({e['points']:+d})")
             last_events = len(info["events"])
 
-        cam_panel = draw_overlay(follower)
+        cam_panel = draw_overlay(keeper)
         chase.update_scene(env.data, camera=chase_cam)
-        chase_panel = hud(cv2.cvtColor(chase.render(), cv2.COLOR_RGB2BGR), info, obs, follower.err)
+        chase_panel = hud(cv2.cvtColor(chase.render(), cv2.COLOR_RGB2BGR), info, obs, keeper.err)
         window = np.hstack([cam_panel, chase_panel])
 
         if args.record:
@@ -147,7 +148,7 @@ def main():
                 break
             term = trunc = False
             obs, info = env.reset()
-            follower = VisionLineFollower(env)
+            keeper = VisionLaneKeeper(env)
             last_events = 0
         i += 1
 

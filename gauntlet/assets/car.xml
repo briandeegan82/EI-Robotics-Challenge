@@ -22,6 +22,8 @@
 
     <!-- onboard camera: pitched ~20 deg down to see the line and the horizon -->
     <camera name="onboard" pos="0.10 0 0.075" xyaxes="0 -1 0  0.342 0 0.940" fovy="78"/>
+    <geom name="camera_mount" type="box" size="0.008 0.008 0.015" pos="0.10 0 0.050"
+          mass="0.01" rgba="0.12 0.12 0.12 1"/>
     <geom name="camera_body" type="box" size="0.01 0.012 0.01" pos="0.10 0 0.075"
           mass="0.01" rgba="0.15 0.15 0.15 1"/>
 

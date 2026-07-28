@@ -6,19 +6,20 @@ and keep the best). Points are secondary and used for tie-breaking.
 Implemented from the official tables:
 
 Bonuses (auto-judged subset — smoothness/precision are judged by humans):
-    +5   obstacle avoidance (dynamic obstacle passed without contact)
+    +5   obstacle avoidance (dynamic bicycle passed without contact)
     +5   low-light navigation (tunnel #2 cleared without contact)
     +5   high-glare handling (no lane violations through the glare curve)
     +5   speed section mastery (>1.5 m/s there without losing the line)
     +10  stopping accuracy (stop within 5 cm of the cube, no contact)
 
 Penalties:
-    -2   minor off-track (wheel on the boundary), per incident
+    -2   leaving the track, once per incident until the car returns
     -5   hesitation/stalling more than 2 s
+    -10  crossing the traffic-light stop line on red
     -15  contact with an obstacle or the stop cube
 
 Attempt-forfeiting fouls (no lap time recorded):
-    complete loss of track, collision with track structure, flip, lap timeout
+    collision with track structure, flip, lap timeout
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ POINTS = {
     "stop_precise": 10,
     "off_track_minor": -2,
     "stall": -5,
+    "traffic_light_violation": -10,
     "obstacle_contact": -15,
     "cube_contact": -15,
 }
@@ -65,6 +67,10 @@ class ScoreKeeper:
 
     def stall(self, t: float):
         self._add("stall", t, POINTS["stall"])
+
+    def traffic_light_violation(self, t: float):
+        self._add("traffic_light_violation", t, POINTS["traffic_light_violation"],
+                  "crossed stop line on red")
 
     def obstacle_contact(self, t: float):
         self._add("obstacle_contact", t, POINTS["obstacle_contact"])

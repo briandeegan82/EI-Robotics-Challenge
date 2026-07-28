@@ -6,30 +6,32 @@ vehicles — this simulator exists so your team can understand the course,
 prototype the vision pipeline and control logic, and practice long before you
 touch hardware.
 
-The track mirrors the official layout: a white line on a dark surface around
-a loop that fits the official 7m × 4m footprint, with every challenge section
-from the guidelines:
+The track follows the supplied multi-level course diagram: a paved strip with
+white edges winds through every challenge section in a roughly 9.4 m × 6.7 m
+simulation footprint:
 
 ```
-                       ┌─ tunnel #1 (lit) ─┐   30
-        ◄──────────────┤███████████████████├───▼─────◄──────────
-      ┌─                 speed section  [dyn obstacle]           ─┐
-  HIGH GLARE                                                    curve
-  (reflective)                                                    │
-      └─   tunnel #2 (dark)                choke ▲│▲              ─┘
-        ───┤███ [obstacle] ███├──┃━►──■───────────┴──────────►
-                              start  stop      lane keeping
-                              /finish cube (after lap)
+       start ── lane keeping ── choke ────────────────┐
+       ▲                                             │
+  traffic light                                      ▼
+       │    tunnel #1 (lit) / speed ◄──────── bicycle ┘
+       │
+       │    glare ────────────────────────────────┐
+       │                                         winding turn
+       └──── tunnel #2 (dark + block) ◄───────────┘
 ```
 
-Driving order: **start → lane keeping → choke point → curve → tunnel #1 →
-speed section (dynamic obstacle) → high-glare curve → tunnel #2 (obstacle
-inside) → finish → stop cube**.
+Driving order: **start → lane keeping → choke → first descent → second turn →
+middle speed straight with the dynamic bicycle halfway along it → tunnel #1 →
+high glare → winding return → tunnel #2 → traffic light → finish → stop
+cube**.
 
 An attempt, exactly as in the official rules: complete one lap (fastest lap
-of 3 attempts wins), then the white 20 cm stop cube is placed on the track
+of 3 attempts wins), then a white 15 cm stop block is placed on one side
+of the track
 and the car must **stop within 10 cm of it without touching it** (30 s
-allowed). Off-track = forfeit; hitting track structure = forfeit.
+allowed). Leaving the track costs points until the car returns; hitting track
+structure still forfeits the attempt.
 
 ## Quickstart
 
@@ -45,14 +47,14 @@ python examples/drive_keyboard.py
 python examples/run_example_controller.py
 
 # the real thing: camera-based line following
-python examples/vision_line_follower.py
+python examples/vision_lane_keeper.py
 
 # SEE what the camera sees, with the line-detection overlay
 pip install -e ".[viz]"        # one-time: adds OpenCV
 python examples/view_camera.py
 
 # headless (no graphics window; camera rendering still needs OpenGL)
-MUJOCO_GL=osmesa python examples/vision_line_follower.py --headless --seed 3
+MUJOCO_GL=osmesa python examples/vision_lane_keeper.py --headless --seed 3
 ```
 
 ## The rules, in simulation
@@ -70,15 +72,16 @@ Faithful to the official guidelines wherever they can be auto-judged:
 
 | points | event (auto-judged subset of the official tables) |
 |---|---|
-| +5 | dynamic obstacle passed without contact |
+| +5 | dynamic bicycle passed without contact |
 | +5 | tunnel #2 (low light) cleared without contact |
 | +5 | high-glare curve without lane violations |
 | +5 | speed section at >1.5 m/s without losing the line |
 | +10 | stop within 5 cm of the cube, no contact |
-| −2 | minor off-track (wheel on the boundary), per incident |
+| −2 | leaving the track, once per incident until the car returns |
 | −5 | stalling >2 s |
+| −10 | crossing the traffic-light stop line on red |
 | −15 | contact with an obstacle or the stop cube |
-| forfeit | complete loss of track, collision with track structure, flip |
+| forfeit | collision with track structure, flip, lap timeout |
 
 Smoothness/precision bonuses from the official table are judged by humans at
 the event and aren't scored here. Values live in `gauntlet/scoring.py`.
@@ -120,10 +123,11 @@ the column the follower steers toward) next to a chase view — the fastest way
 to see why a follower drifts. The course is deliberately hostile to naive
 vision, just like the real event:
 
-- the **glare curve** washes the floor out to near-white (fixed thresholds die
-  here — see the median-relative threshold in `vision_line_follower.py`),
+- the **glare straight** washes the floor out to near-white (fixed thresholds
+  die here — see the adaptive threshold in `vision_lane_keeper.py`),
 - **tunnel #1** is dim, **tunnel #2** is genuinely dark,
-- both tunnel mouths mix bright and dark content in one frame.
+- both tunnel mouths mix bright and dark content in one frame,
+- the roadside signal follows a 6 s green / 4 s red cycle.
 
 **`info["privileged"]`** — ground truth (pose, arc length, lateral offset,
 obstacle positions, cube distance) that the real robot will **not** have.
@@ -144,11 +148,10 @@ gauntlet/
     car.xml          the Rubik Pi-class car (camera, IMU, encoders)
 examples/
   drive_keyboard.py          drive manually to learn the course
-  example_controller.py      pure-pursuit reference (privileged info; 15/15
-                             clean laps ~10.5 s, max auto-judged points)
+  example_controller.py      pure-pursuit reference using privileged info
   run_example_controller.py  runs the reference controller
-  vision_line_follower.py    camera-based line following — the real approach
-                             (~18 s laps; obstacle/stop logic still privileged)
+  vision_lane_keeper.py      camera-based line following — the real approach
+                             (obstacle/stop/signal logic still privileged)
   view_camera.py             live onboard-camera view with the line-detection
                              overlay + chase view (needs the [viz] extra)
 ```

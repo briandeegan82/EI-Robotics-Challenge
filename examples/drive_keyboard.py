@@ -23,34 +23,38 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
 
-from gauntlet import GauntletEnv
+from gauntlet import GauntletEnv, track
 
 # GLFW key codes used by the MuJoCo viewer
 KEY_RIGHT, KEY_LEFT, KEY_DOWN, KEY_UP = 262, 263, 264, 265
 KEY_SPACE, KEY_BACKSPACE = 32, 259
+STEER_KEY_STEP = 0.12
+STEER_RESPONSE = 0.08
 
 action = np.zeros(2)
+target_steer = 0.0
 want_reset = False
 
 
 def on_key(keycode):
-    global want_reset
+    global target_steer, want_reset
     if keycode == KEY_UP:
         action[1] = min(1.0, action[1] + 0.15)
     elif keycode == KEY_DOWN:
         action[1] = max(-1.0, action[1] - 0.15)
     elif keycode == KEY_LEFT:
-        action[0] = min(1.0, action[0] + 0.25)
+        target_steer = min(1.0, target_steer + STEER_KEY_STEP)
     elif keycode == KEY_RIGHT:
-        action[0] = max(-1.0, action[0] - 0.25)
+        target_steer = max(-1.0, target_steer - STEER_KEY_STEP)
     elif keycode == KEY_SPACE:
         action[:] = 0
+        target_steer = 0.0
     elif keycode == KEY_BACKSPACE:
         want_reset = True
 
 
 def main():
-    global want_reset
+    global target_steer, want_reset
     import mujoco.viewer
 
     env = GauntletEnv()
@@ -70,9 +74,11 @@ def main():
             if want_reset or done:
                 obs, info = env.reset()
                 action[:] = 0
+                target_steer = 0.0
                 last_events, done, want_reset = 0, False, False
                 print("\n--- new run ---")
 
+            action[0] += STEER_RESPONSE * (target_steer - action[0])
             obs, _, terminated, truncated, info = env.step(action)
             done = terminated or truncated
 
@@ -88,8 +94,9 @@ def main():
                 continue
 
             p = info["privileged"]
-            print(f"\rspeed {obs[0]:5.2f} m/s   lap {p['progress'] / 14.91 * 100:5.1f}%   "
+            print(f"\rspeed {obs[0]:5.2f} m/s   lap {p['progress'] / track.TOTAL * 100:5.1f}%   "
                   f"off-line {p['lateral']:+.2f} m   phase {info['phase']:<5}"
+                  f"signal {p['traffic_light']['state']:<5}   "
                   f"pts {info['score']:4d}   t {info['time']:6.1f}s ", end="")
 
             viewer.sync()

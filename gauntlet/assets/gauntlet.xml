@@ -1,14 +1,15 @@
 <!--
-  The Gauntlet - line-following competition track (GENERATED FILE).
+  The Gauntlet - lane-keeping competition track (GENERATED FILE).
 
   Edit gauntlet/track.py or gauntlet/generate_track.py and rerun
       python -m gauntlet.generate_track
   instead of editing this file by hand.
 
-  Stadium loop, driven counter-clockwise. White ~25 mm line on dark floor.
-  Sections: start -> lane keeping -> choke point -> curve -> tunnel #1 ->
-  speed section (dynamic obstacle) -> high-glare curve -> tunnel #2 ->
-  end zone (stop cube appears after the lap).
+  Diagram-shaped multi-turn loop. A paved road ~0.36 m wide on dark ground,
+  with white edge lines and no center line: the car stays BETWEEN the edges.
+  Sections: lane keeping/choke -> dynamic obstacle -> tunnel #1/speed ->
+  glare -> winding return -> tunnel #2 -> traffic light ->
+  finish and end-zone stop.
 -->
 <mujoco model="gauntlet">
   <compiler angle="radian" autolimits="true"/>
@@ -24,167 +25,313 @@
 
   <asset>
     <texture type="skybox" builtin="gradient" rgb1="0.45 0.65 0.9" rgb2="0.9 0.95 1" width="256" height="256"/>
-    <texture type="2d" name="carpet" builtin="checker" rgb1="0.16 0.16 0.18" rgb2="0.18 0.18 0.2"
+    <!-- dark ground surrounding the road, so the paved strip stands out -->
+    <texture type="2d" name="carpet" builtin="checker" rgb1="0.09 0.10 0.09" rgb2="0.11 0.12 0.11"
              width="512" height="512"/>
     <material name="floor" texture="carpet" texrepeat="16 16" texuniform="true" reflectance="0" specular="0.1"/>
+    <!-- paved road surface: mid gray, clearly brighter than the ground -->
+    <material name="road" rgba="0.40 0.40 0.43 1" reflectance="0.05" specular="0.1"/>
     <material name="line" rgba="0.93 0.93 0.93 1"/>
-    <!-- high-glare slab: bright + strongly reflective, washes out line contrast -->
-    <material name="glare" rgba="0.8 0.8 0.85 1" reflectance="0.8" specular="1" shininess="1"/>
+    <!-- high-glare road: bright + strongly reflective, washes out edge contrast -->
+    <material name="glare" rgba="0.82 0.82 0.86 1" reflectance="0.8" specular="1" shininess="1"/>
   </asset>
 
   <worldbody>
     <light directional="true" pos="3 -4 6" dir="-0.35 0.45 -0.85" diffuse="0.85 0.85 0.8" castshadow="true"/>
-    <light name="tunnel1_light" pos="1.30 1.1 0.21" dir="0 0 -1" diffuse="0.45 0.45 0.4" cutoff="70"/>
+    <light name="tunnel1_light" pos="-1.30 0.20 0.21" dir="0 0 -1" diffuse="0.45 0.45 0.4" cutoff="70"/>
 
-    <geom name="ground" type="plane" size="0 0 1" rgba="0.35 0.4 0.35 1"/>
-    <!-- dark track floor, 7 x 4 m footprint -->
-    <geom name="floor" type="box" size="3.5 2.0 0.01" pos="0 0 0.01" material="floor"/>
-    <!-- high-glare area covering the left curve; ends before the tunnel #2
-         entrance so the glare and low-light challenges stay distinct -->
-    <geom name="glare_slab" type="box" size="0.675 2.0 0.0006" pos="-2.725 0 0.0206"
-          material="glare" contype="0" conaffinity="0"/>
+    <geom name="ground" type="plane" size="0 0 1" rgba="0.25 0.32 0.25 1"/>
+    <geom name="floor" type="box" size="4.67 3.35 0.01"
+          pos="-0.12 -0.30 0.01" material="floor"/>
 
-    <geom name="line_bottom" type="box" size="2.0 0.0125 0.0007" pos="0 -1.1 0.022" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_top" type="box" size="2.0 0.0125 0.0007" pos="0 1.1 0.022" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r0" type="box" size="0.0328 0.0125 0.0007" pos="2.0288 -1.0996 0.022" euler="0 0 0.0262" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r1" type="box" size="0.0328 0.0125 0.0007" pos="2.0863 -1.0966 0.022" euler="0 0 0.0785" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r2" type="box" size="0.0328 0.0125 0.0007" pos="2.1436 -1.0906 0.022" euler="0 0 0.1309" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r3" type="box" size="0.0328 0.0125 0.0007" pos="2.2005 -1.0816 0.022" euler="0 0 0.1833" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r4" type="box" size="0.0328 0.0125 0.0007" pos="2.2568 -1.0696 0.022" euler="0 0 0.2356" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r5" type="box" size="0.0328 0.0125 0.0007" pos="2.3124 -1.0547 0.022" euler="0 0 0.2880" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r6" type="box" size="0.0328 0.0125 0.0007" pos="2.3672 -1.0369 0.022" euler="0 0 0.3403" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r7" type="box" size="0.0328 0.0125 0.0007" pos="2.4210 -1.0163 0.022" euler="0 0 0.3927" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r8" type="box" size="0.0328 0.0125 0.0007" pos="2.4736 -0.9928 0.022" euler="0 0 0.4451" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r9" type="box" size="0.0328 0.0125 0.0007" pos="2.5249 -0.9667 0.022" euler="0 0 0.4974" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r10" type="box" size="0.0328 0.0125 0.0007" pos="2.5747 -0.9379 0.022" euler="0 0 0.5498" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r11" type="box" size="0.0328 0.0125 0.0007" pos="2.6230 -0.9065 0.022" euler="0 0 0.6021" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r12" type="box" size="0.0328 0.0125 0.0007" pos="2.6696 -0.8727 0.022" euler="0 0 0.6545" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r13" type="box" size="0.0328 0.0125 0.0007" pos="2.7144 -0.8364 0.022" euler="0 0 0.7069" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r14" type="box" size="0.0328 0.0125 0.0007" pos="2.7572 -0.7979 0.022" euler="0 0 0.7592" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r15" type="box" size="0.0328 0.0125 0.0007" pos="2.7979 -0.7572 0.022" euler="0 0 0.8116" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r16" type="box" size="0.0328 0.0125 0.0007" pos="2.8364 -0.7144 0.022" euler="0 0 0.8639" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r17" type="box" size="0.0328 0.0125 0.0007" pos="2.8727 -0.6696 0.022" euler="0 0 0.9163" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r18" type="box" size="0.0328 0.0125 0.0007" pos="2.9065 -0.6230 0.022" euler="0 0 0.9687" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r19" type="box" size="0.0328 0.0125 0.0007" pos="2.9379 -0.5747 0.022" euler="0 0 1.0210" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r20" type="box" size="0.0328 0.0125 0.0007" pos="2.9667 -0.5249 0.022" euler="0 0 1.0734" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r21" type="box" size="0.0328 0.0125 0.0007" pos="2.9928 -0.4736 0.022" euler="0 0 1.1257" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r22" type="box" size="0.0328 0.0125 0.0007" pos="3.0163 -0.4210 0.022" euler="0 0 1.1781" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r23" type="box" size="0.0328 0.0125 0.0007" pos="3.0369 -0.3672 0.022" euler="0 0 1.2305" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r24" type="box" size="0.0328 0.0125 0.0007" pos="3.0547 -0.3124 0.022" euler="0 0 1.2828" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r25" type="box" size="0.0328 0.0125 0.0007" pos="3.0696 -0.2568 0.022" euler="0 0 1.3352" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r26" type="box" size="0.0328 0.0125 0.0007" pos="3.0816 -0.2005 0.022" euler="0 0 1.3875" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r27" type="box" size="0.0328 0.0125 0.0007" pos="3.0906 -0.1436 0.022" euler="0 0 1.4399" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r28" type="box" size="0.0328 0.0125 0.0007" pos="3.0966 -0.0863 0.022" euler="0 0 1.4923" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r29" type="box" size="0.0328 0.0125 0.0007" pos="3.0996 -0.0288 0.022" euler="0 0 1.5446" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r30" type="box" size="0.0328 0.0125 0.0007" pos="3.0996 0.0288 0.022" euler="0 0 1.5970" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r31" type="box" size="0.0328 0.0125 0.0007" pos="3.0966 0.0863 0.022" euler="0 0 1.6493" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r32" type="box" size="0.0328 0.0125 0.0007" pos="3.0906 0.1436 0.022" euler="0 0 1.7017" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r33" type="box" size="0.0328 0.0125 0.0007" pos="3.0816 0.2005 0.022" euler="0 0 1.7541" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r34" type="box" size="0.0328 0.0125 0.0007" pos="3.0696 0.2568 0.022" euler="0 0 1.8064" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r35" type="box" size="0.0328 0.0125 0.0007" pos="3.0547 0.3124 0.022" euler="0 0 1.8588" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r36" type="box" size="0.0328 0.0125 0.0007" pos="3.0369 0.3672 0.022" euler="0 0 1.9111" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r37" type="box" size="0.0328 0.0125 0.0007" pos="3.0163 0.4210 0.022" euler="0 0 1.9635" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r38" type="box" size="0.0328 0.0125 0.0007" pos="2.9928 0.4736 0.022" euler="0 0 2.0159" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r39" type="box" size="0.0328 0.0125 0.0007" pos="2.9667 0.5249 0.022" euler="0 0 2.0682" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r40" type="box" size="0.0328 0.0125 0.0007" pos="2.9379 0.5747 0.022" euler="0 0 2.1206" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r41" type="box" size="0.0328 0.0125 0.0007" pos="2.9065 0.6230 0.022" euler="0 0 2.1729" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r42" type="box" size="0.0328 0.0125 0.0007" pos="2.8727 0.6696 0.022" euler="0 0 2.2253" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r43" type="box" size="0.0328 0.0125 0.0007" pos="2.8364 0.7144 0.022" euler="0 0 2.2777" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r44" type="box" size="0.0328 0.0125 0.0007" pos="2.7979 0.7572 0.022" euler="0 0 2.3300" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r45" type="box" size="0.0328 0.0125 0.0007" pos="2.7572 0.7979 0.022" euler="0 0 2.3824" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r46" type="box" size="0.0328 0.0125 0.0007" pos="2.7144 0.8364 0.022" euler="0 0 2.4347" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r47" type="box" size="0.0328 0.0125 0.0007" pos="2.6696 0.8727 0.022" euler="0 0 2.4871" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r48" type="box" size="0.0328 0.0125 0.0007" pos="2.6230 0.9065 0.022" euler="0 0 2.5395" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r49" type="box" size="0.0328 0.0125 0.0007" pos="2.5747 0.9379 0.022" euler="0 0 2.5918" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r50" type="box" size="0.0328 0.0125 0.0007" pos="2.5249 0.9667 0.022" euler="0 0 2.6442" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r51" type="box" size="0.0328 0.0125 0.0007" pos="2.4736 0.9928 0.022" euler="0 0 2.6965" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r52" type="box" size="0.0328 0.0125 0.0007" pos="2.4210 1.0163 0.022" euler="0 0 2.7489" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r53" type="box" size="0.0328 0.0125 0.0007" pos="2.3672 1.0369 0.022" euler="0 0 2.8013" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r54" type="box" size="0.0328 0.0125 0.0007" pos="2.3124 1.0547 0.022" euler="0 0 2.8536" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r55" type="box" size="0.0328 0.0125 0.0007" pos="2.2568 1.0696 0.022" euler="0 0 2.9060" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r56" type="box" size="0.0328 0.0125 0.0007" pos="2.2005 1.0816 0.022" euler="0 0 2.9583" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r57" type="box" size="0.0328 0.0125 0.0007" pos="2.1436 1.0906 0.022" euler="0 0 3.0107" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r58" type="box" size="0.0328 0.0125 0.0007" pos="2.0863 1.0966 0.022" euler="0 0 3.0631" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_r59" type="box" size="0.0328 0.0125 0.0007" pos="2.0288 1.0996 0.022" euler="0 0 3.1154" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l0" type="box" size="0.0328 0.0125 0.0007" pos="-2.0288 1.0996 0.022" euler="0 0 3.1678" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l1" type="box" size="0.0328 0.0125 0.0007" pos="-2.0863 1.0966 0.022" euler="0 0 3.2201" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l2" type="box" size="0.0328 0.0125 0.0007" pos="-2.1436 1.0906 0.022" euler="0 0 3.2725" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l3" type="box" size="0.0328 0.0125 0.0007" pos="-2.2005 1.0816 0.022" euler="0 0 3.3249" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l4" type="box" size="0.0328 0.0125 0.0007" pos="-2.2568 1.0696 0.022" euler="0 0 3.3772" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l5" type="box" size="0.0328 0.0125 0.0007" pos="-2.3124 1.0547 0.022" euler="0 0 3.4296" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l6" type="box" size="0.0328 0.0125 0.0007" pos="-2.3672 1.0369 0.022" euler="0 0 3.4819" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l7" type="box" size="0.0328 0.0125 0.0007" pos="-2.4210 1.0163 0.022" euler="0 0 3.5343" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l8" type="box" size="0.0328 0.0125 0.0007" pos="-2.4736 0.9928 0.022" euler="0 0 3.5867" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l9" type="box" size="0.0328 0.0125 0.0007" pos="-2.5249 0.9667 0.022" euler="0 0 3.6390" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l10" type="box" size="0.0328 0.0125 0.0007" pos="-2.5747 0.9379 0.022" euler="0 0 3.6914" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l11" type="box" size="0.0328 0.0125 0.0007" pos="-2.6230 0.9065 0.022" euler="0 0 3.7437" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l12" type="box" size="0.0328 0.0125 0.0007" pos="-2.6696 0.8727 0.022" euler="0 0 3.7961" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l13" type="box" size="0.0328 0.0125 0.0007" pos="-2.7144 0.8364 0.022" euler="0 0 3.8485" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l14" type="box" size="0.0328 0.0125 0.0007" pos="-2.7572 0.7979 0.022" euler="0 0 3.9008" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l15" type="box" size="0.0328 0.0125 0.0007" pos="-2.7979 0.7572 0.022" euler="0 0 3.9532" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l16" type="box" size="0.0328 0.0125 0.0007" pos="-2.8364 0.7144 0.022" euler="0 0 4.0055" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l17" type="box" size="0.0328 0.0125 0.0007" pos="-2.8727 0.6696 0.022" euler="0 0 4.0579" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l18" type="box" size="0.0328 0.0125 0.0007" pos="-2.9065 0.6230 0.022" euler="0 0 4.1103" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l19" type="box" size="0.0328 0.0125 0.0007" pos="-2.9379 0.5747 0.022" euler="0 0 4.1626" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l20" type="box" size="0.0328 0.0125 0.0007" pos="-2.9667 0.5249 0.022" euler="0 0 4.2150" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l21" type="box" size="0.0328 0.0125 0.0007" pos="-2.9928 0.4736 0.022" euler="0 0 4.2673" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l22" type="box" size="0.0328 0.0125 0.0007" pos="-3.0163 0.4210 0.022" euler="0 0 4.3197" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l23" type="box" size="0.0328 0.0125 0.0007" pos="-3.0369 0.3672 0.022" euler="0 0 4.3720" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l24" type="box" size="0.0328 0.0125 0.0007" pos="-3.0547 0.3124 0.022" euler="0 0 4.4244" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l25" type="box" size="0.0328 0.0125 0.0007" pos="-3.0696 0.2568 0.022" euler="0 0 4.4768" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l26" type="box" size="0.0328 0.0125 0.0007" pos="-3.0816 0.2005 0.022" euler="0 0 4.5291" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l27" type="box" size="0.0328 0.0125 0.0007" pos="-3.0906 0.1436 0.022" euler="0 0 4.5815" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l28" type="box" size="0.0328 0.0125 0.0007" pos="-3.0966 0.0863 0.022" euler="0 0 4.6338" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l29" type="box" size="0.0328 0.0125 0.0007" pos="-3.0996 0.0288 0.022" euler="0 0 4.6862" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l30" type="box" size="0.0328 0.0125 0.0007" pos="-3.0996 -0.0288 0.022" euler="0 0 4.7386" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l31" type="box" size="0.0328 0.0125 0.0007" pos="-3.0966 -0.0863 0.022" euler="0 0 4.7909" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l32" type="box" size="0.0328 0.0125 0.0007" pos="-3.0906 -0.1436 0.022" euler="0 0 4.8433" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l33" type="box" size="0.0328 0.0125 0.0007" pos="-3.0816 -0.2005 0.022" euler="0 0 4.8956" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l34" type="box" size="0.0328 0.0125 0.0007" pos="-3.0696 -0.2568 0.022" euler="0 0 4.9480" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l35" type="box" size="0.0328 0.0125 0.0007" pos="-3.0547 -0.3124 0.022" euler="0 0 5.0004" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l36" type="box" size="0.0328 0.0125 0.0007" pos="-3.0369 -0.3672 0.022" euler="0 0 5.0527" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l37" type="box" size="0.0328 0.0125 0.0007" pos="-3.0163 -0.4210 0.022" euler="0 0 5.1051" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l38" type="box" size="0.0328 0.0125 0.0007" pos="-2.9928 -0.4736 0.022" euler="0 0 5.1574" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l39" type="box" size="0.0328 0.0125 0.0007" pos="-2.9667 -0.5249 0.022" euler="0 0 5.2098" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l40" type="box" size="0.0328 0.0125 0.0007" pos="-2.9379 -0.5747 0.022" euler="0 0 5.2622" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l41" type="box" size="0.0328 0.0125 0.0007" pos="-2.9065 -0.6230 0.022" euler="0 0 5.3145" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l42" type="box" size="0.0328 0.0125 0.0007" pos="-2.8727 -0.6696 0.022" euler="0 0 5.3669" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l43" type="box" size="0.0328 0.0125 0.0007" pos="-2.8364 -0.7144 0.022" euler="0 0 5.4192" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l44" type="box" size="0.0328 0.0125 0.0007" pos="-2.7979 -0.7572 0.022" euler="0 0 5.4716" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l45" type="box" size="0.0328 0.0125 0.0007" pos="-2.7572 -0.7979 0.022" euler="0 0 5.5240" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l46" type="box" size="0.0328 0.0125 0.0007" pos="-2.7144 -0.8364 0.022" euler="0 0 5.5763" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l47" type="box" size="0.0328 0.0125 0.0007" pos="-2.6696 -0.8727 0.022" euler="0 0 5.6287" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l48" type="box" size="0.0328 0.0125 0.0007" pos="-2.6230 -0.9065 0.022" euler="0 0 5.6810" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l49" type="box" size="0.0328 0.0125 0.0007" pos="-2.5747 -0.9379 0.022" euler="0 0 5.7334" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l50" type="box" size="0.0328 0.0125 0.0007" pos="-2.5249 -0.9667 0.022" euler="0 0 5.7858" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l51" type="box" size="0.0328 0.0125 0.0007" pos="-2.4736 -0.9928 0.022" euler="0 0 5.8381" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l52" type="box" size="0.0328 0.0125 0.0007" pos="-2.4210 -1.0163 0.022" euler="0 0 5.8905" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l53" type="box" size="0.0328 0.0125 0.0007" pos="-2.3672 -1.0369 0.022" euler="0 0 5.9428" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l54" type="box" size="0.0328 0.0125 0.0007" pos="-2.3124 -1.0547 0.022" euler="0 0 5.9952" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l55" type="box" size="0.0328 0.0125 0.0007" pos="-2.2568 -1.0696 0.022" euler="0 0 6.0476" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l56" type="box" size="0.0328 0.0125 0.0007" pos="-2.2005 -1.0816 0.022" euler="0 0 6.0999" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l57" type="box" size="0.0328 0.0125 0.0007" pos="-2.1436 -1.0906 0.022" euler="0 0 6.1523" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l58" type="box" size="0.0328 0.0125 0.0007" pos="-2.0863 -1.0966 0.022" euler="0 0 6.2046" material="line" contype="0" conaffinity="0"/>
-    <geom name="line_l59" type="box" size="0.0328 0.0125 0.0007" pos="-2.0288 -1.0996 0.022" euler="0 0 6.2570" material="line" contype="0" conaffinity="0"/>
-    <geom name="start_line" type="box" size="0.02 0.18 0.0008" pos="-0.3999999999999999 -1.1 0.022199999999999998" material="line" contype="0" conaffinity="0"/>
-    <geom name="choke_wall_l" type="box" size="0.19999999999999996 0.015 0.05" pos="1.5999999999999999 -0.9750000000000001 0.07" rgba="0.55 0.55 0.6 1"/>
-    <geom name="choke_wall_r" type="box" size="0.19999999999999996 0.015 0.05" pos="1.5999999999999999 -1.225 0.07" rgba="0.55 0.55 0.6 1"/>
-    <geom name="tunnel1_wall_l" type="box" size="0.6000000000000005 0.015 0.1" pos="1.3 1.395 0.12" rgba="0.55 0.55 0.6 1"/>
-    <geom name="tunnel1_wall_r" type="box" size="0.6000000000000005 0.015 0.1" pos="1.3 0.8050000000000002 0.12" rgba="0.55 0.55 0.6 1"/>
-    <geom name="tunnel1_roof_l" type="box" size="0.6000000000000005 0.09 0.006" pos="1.3 1.31 0.228" rgba="0.55 0.55 0.6 1"/>
-    <geom name="tunnel1_roof_r" type="box" size="0.6000000000000005 0.09 0.006" pos="1.3 0.8900000000000001 0.228" rgba="0.55 0.55 0.6 1"/>
-    <geom name="tunnel2_wall_l" type="box" size="0.6 0.015 0.1" pos="-1.3 -0.8050000000000002 0.12" rgba="0.55 0.55 0.6 1"/>
-    <geom name="tunnel2_wall_r" type="box" size="0.6 0.015 0.1" pos="-1.3 -1.395 0.12" rgba="0.55 0.55 0.6 1"/>
-    <geom name="tunnel2_roof" type="box" size="0.6 0.31 0.006" pos="-1.3 -1.1 0.228" rgba="0.4 0.4 0.45 1"/>
-    <body name="dyn_obstacle" mocap="true" pos="-0.800 1.100 0.11">
-      <geom name="dyn_obstacle_box" type="box" size="0.06 0.06 0.09" rgba="0.85 0.35 0.1 1"/>
+    <geom name="road_0" type="box" size="3.1466 0.18 0.0006" pos="-0.1500 2.3500 0.0206" euler="0 0 0.0000" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_0_l" type="box" size="3.1466 0.0125 0.0004" pos="-0.1500 2.5300 0.0212" euler="0 0 0.0000" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_0_r" type="box" size="3.1466 0.0125 0.0004" pos="-0.1500 2.1700 0.0212" euler="0 0 0.0000" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_1" type="box" size="0.0413 0.18 0.0006" pos="3.0298 2.3482 0.0206" euler="0 0 -0.0982" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_1_l" type="box" size="0.0413 0.0125 0.0004" pos="3.0475 2.5273 0.0212" euler="0 0 -0.0982" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_1_r" type="box" size="0.0413 0.0125 0.0004" pos="3.0122 2.1690 0.0212" euler="0 0 -0.0982" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_2" type="box" size="0.0413 0.18 0.0006" pos="3.1029 2.3336 0.0206" euler="0 0 -0.2945" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_2_l" type="box" size="0.0413 0.0125 0.0004" pos="3.1552 2.5059 0.0212" euler="0 0 -0.2945" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_2_r" type="box" size="0.0413 0.0125 0.0004" pos="3.0507 2.1614 0.0212" euler="0 0 -0.2945" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_3" type="box" size="0.0413 0.18 0.0006" pos="3.1717 2.3051 0.0206" euler="0 0 -0.4909" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_3_l" type="box" size="0.0413 0.0125 0.0004" pos="3.2566 2.4639 0.0212" euler="0 0 -0.4909" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_3_r" type="box" size="0.0413 0.0125 0.0004" pos="3.0869 2.1464 0.0212" euler="0 0 -0.4909" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_4" type="box" size="0.0413 0.18 0.0006" pos="3.2337 2.2637 0.0206" euler="0 0 -0.6872" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_4_l" type="box" size="0.0413 0.0125 0.0004" pos="3.3479 2.4029 0.0212" euler="0 0 -0.6872" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_4_r" type="box" size="0.0413 0.0125 0.0004" pos="3.1195 2.1246 0.0212" euler="0 0 -0.6872" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_5" type="box" size="0.3416 0.18 0.0006" pos="3.5000 2.0000 0.0206" euler="0 0 -0.7854" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_5_l" type="box" size="0.3416 0.0125 0.0004" pos="3.6273 2.1273 0.0212" euler="0 0 -0.7854" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_5_r" type="box" size="0.3416 0.0125 0.0004" pos="3.3727 1.8727 0.0212" euler="0 0 -0.7854" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_6" type="box" size="0.0413 0.18 0.0006" pos="3.7637 1.7337 0.0206" euler="0 0 -0.8836" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_6_l" type="box" size="0.0413 0.0125 0.0004" pos="3.9029 1.8479 0.0212" euler="0 0 -0.8836" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_6_r" type="box" size="0.0413 0.0125 0.0004" pos="3.6246 1.6195 0.0212" euler="0 0 -0.8836" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_7" type="box" size="0.0413 0.18 0.0006" pos="3.8051 1.6717 0.0206" euler="0 0 -1.0799" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_7_l" type="box" size="0.0413 0.0125 0.0004" pos="3.9639 1.7566 0.0212" euler="0 0 -1.0799" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_7_r" type="box" size="0.0413 0.0125 0.0004" pos="3.6464 1.5869 0.0212" euler="0 0 -1.0799" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_8" type="box" size="0.0413 0.18 0.0006" pos="3.8336 1.6029 0.0206" euler="0 0 -1.2763" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_8_l" type="box" size="0.0413 0.0125 0.0004" pos="4.0059 1.6552 0.0212" euler="0 0 -1.2763" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_8_r" type="box" size="0.0413 0.0125 0.0004" pos="3.6614 1.5507 0.0212" euler="0 0 -1.2763" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_9" type="box" size="0.0413 0.18 0.0006" pos="3.8482 1.5298 0.0206" euler="0 0 -1.4726" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_9_l" type="box" size="0.0413 0.0125 0.0004" pos="4.0273 1.5475 0.0212" euler="0 0 -1.4726" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_9_r" type="box" size="0.0413 0.0125 0.0004" pos="3.6690 1.5122 0.0212" euler="0 0 -1.4726" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_10" type="box" size="0.2966 0.18 0.0006" pos="3.8500 1.2000 0.0206" euler="0 0 -1.5708" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_10_l" type="box" size="0.2966 0.0125 0.0004" pos="4.0300 1.2000 0.0212" euler="0 0 -1.5708" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_10_r" type="box" size="0.2966 0.0125 0.0004" pos="3.6700 1.2000 0.0212" euler="0 0 -1.5708" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_11" type="box" size="0.0413 0.18 0.0006" pos="3.8482 0.8702 0.0206" euler="0 0 -1.6690" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_11_l" type="box" size="0.0413 0.0125 0.0004" pos="4.0273 0.8525 0.0212" euler="0 0 -1.6690" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_11_r" type="box" size="0.0413 0.0125 0.0004" pos="3.6690 0.8878 0.0212" euler="0 0 -1.6690" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_12" type="box" size="0.0413 0.18 0.0006" pos="3.8336 0.7971 0.0206" euler="0 0 -1.8653" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_12_l" type="box" size="0.0413 0.0125 0.0004" pos="4.0059 0.7448 0.0212" euler="0 0 -1.8653" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_12_r" type="box" size="0.0413 0.0125 0.0004" pos="3.6614 0.8493 0.0212" euler="0 0 -1.8653" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_13" type="box" size="0.0413 0.18 0.0006" pos="3.8051 0.7283 0.0206" euler="0 0 -2.0617" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_13_l" type="box" size="0.0413 0.0125 0.0004" pos="3.9639 0.6434 0.0212" euler="0 0 -2.0617" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_13_r" type="box" size="0.0413 0.0125 0.0004" pos="3.6464 0.8131 0.0212" euler="0 0 -2.0617" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_14" type="box" size="0.0413 0.18 0.0006" pos="3.7637 0.6663 0.0206" euler="0 0 -2.2580" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_14_l" type="box" size="0.0413 0.0125 0.0004" pos="3.9029 0.5521 0.0212" euler="0 0 -2.2580" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_14_r" type="box" size="0.0413 0.0125 0.0004" pos="3.6246 0.7805 0.0212" euler="0 0 -2.2580" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_15" type="box" size="0.2355 0.18 0.0006" pos="3.5750 0.4750 0.0206" euler="0 0 -2.3562" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_15_l" type="box" size="0.2355 0.0125 0.0004" pos="3.7023 0.3477 0.0212" euler="0 0 -2.3562" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_15_r" type="box" size="0.2355 0.0125 0.0004" pos="3.4477 0.6023 0.0212" euler="0 0 -2.3562" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_16" type="box" size="0.0413 0.18 0.0006" pos="3.3837 0.2863 0.0206" euler="0 0 -2.4544" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_16_l" type="box" size="0.0413 0.0125 0.0004" pos="3.4979 0.1471 0.0212" euler="0 0 -2.4544" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_16_r" type="box" size="0.0413 0.0125 0.0004" pos="3.2695 0.4254 0.0212" euler="0 0 -2.4544" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_17" type="box" size="0.0413 0.18 0.0006" pos="3.3217 0.2449 0.0206" euler="0 0 -2.6507" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_17_l" type="box" size="0.0413 0.0125 0.0004" pos="3.4066 0.0861 0.0212" euler="0 0 -2.6507" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_17_r" type="box" size="0.0413 0.0125 0.0004" pos="3.2369 0.4036 0.0212" euler="0 0 -2.6507" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_18" type="box" size="0.0413 0.18 0.0006" pos="3.2529 0.2164 0.0206" euler="0 0 -2.8471" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_18_l" type="box" size="0.0413 0.0125 0.0004" pos="3.3052 0.0441 0.0212" euler="0 0 -2.8471" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_18_r" type="box" size="0.0413 0.0125 0.0004" pos="3.2007 0.3886 0.0212" euler="0 0 -2.8471" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_19" type="box" size="0.0413 0.18 0.0006" pos="3.1798 0.2018 0.0206" euler="0 0 -3.0434" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_19_l" type="box" size="0.0413 0.0125 0.0004" pos="3.1975 0.0227 0.0212" euler="0 0 -3.0434" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_19_r" type="box" size="0.0413 0.0125 0.0004" pos="3.1622 0.3810 0.0212" euler="0 0 -3.0434" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_20" type="box" size="2.8466 0.18 0.0006" pos="0.3000 0.2000 0.0206" euler="0 0 3.1416" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_20_l" type="box" size="2.8466 0.0125 0.0004" pos="0.3000 0.0200 0.0212" euler="0 0 3.1416" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_20_r" type="box" size="2.8466 0.0125 0.0004" pos="0.3000 0.3800 0.0212" euler="0 0 3.1416" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_21" type="box" size="0.0413 0.18 0.0006" pos="-2.5798 0.1982 0.0206" euler="0 0 3.2398" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_21_l" type="box" size="0.0413 0.0125 0.0004" pos="-2.5622 0.0190 0.0212" euler="0 0 3.2398" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_21_r" type="box" size="0.0413 0.0125 0.0004" pos="-2.5975 0.3773 0.0212" euler="0 0 3.2398" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_22" type="box" size="0.0413 0.18 0.0006" pos="-2.6529 0.1836 0.0206" euler="0 0 3.4361" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_22_l" type="box" size="0.0413 0.0125 0.0004" pos="-2.6007 0.0114 0.0212" euler="0 0 3.4361" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_22_r" type="box" size="0.0413 0.0125 0.0004" pos="-2.7052 0.3559 0.0212" euler="0 0 3.4361" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_23" type="box" size="0.0413 0.18 0.0006" pos="-2.7217 0.1551 0.0206" euler="0 0 3.6325" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_23_l" type="box" size="0.0413 0.0125 0.0004" pos="-2.6369 -0.0036 0.0212" euler="0 0 3.6325" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_23_r" type="box" size="0.0413 0.0125 0.0004" pos="-2.8066 0.3139 0.0212" euler="0 0 3.6325" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_24" type="box" size="0.0413 0.18 0.0006" pos="-2.7837 0.1137 0.0206" euler="0 0 3.8288" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_24_l" type="box" size="0.0413 0.0125 0.0004" pos="-2.6695 -0.0254 0.0212" euler="0 0 3.8288" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_24_r" type="box" size="0.0413 0.0125 0.0004" pos="-2.8979 0.2529 0.0212" euler="0 0 3.8288" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_25" type="box" size="0.2709 0.18 0.0006" pos="-3.0000 -0.1000 0.0206" euler="0 0 -2.3562" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_25_l" type="box" size="0.2709 0.0125 0.0004" pos="-2.8727 -0.2273 0.0212" euler="0 0 -2.3562" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_25_r" type="box" size="0.2709 0.0125 0.0004" pos="-3.1273 0.0273 0.0212" euler="0 0 -2.3562" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_26" type="box" size="0.0413 0.18 0.0006" pos="-3.2137 -0.3163 0.0206" euler="0 0 4.0252" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_26_l" type="box" size="0.0413 0.0125 0.0004" pos="-3.0746 -0.4305 0.0212" euler="0 0 4.0252" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_26_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.3529 -0.2021 0.0212" euler="0 0 4.0252" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_27" type="box" size="0.0413 0.18 0.0006" pos="-3.2551 -0.3783 0.0206" euler="0 0 4.2215" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_27_l" type="box" size="0.0413 0.0125 0.0004" pos="-3.0964 -0.4631 0.0212" euler="0 0 4.2215" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_27_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.4139 -0.2934 0.0212" euler="0 0 4.2215" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_28" type="box" size="0.0413 0.18 0.0006" pos="-3.2836 -0.4471 0.0206" euler="0 0 4.4179" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_28_l" type="box" size="0.0413 0.0125 0.0004" pos="-3.1114 -0.4993 0.0212" euler="0 0 4.4179" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_28_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.4559 -0.3948 0.0212" euler="0 0 4.4179" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_29" type="box" size="0.0413 0.18 0.0006" pos="-3.2982 -0.5202 0.0206" euler="0 0 4.6142" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_29_l" type="box" size="0.0413 0.0125 0.0004" pos="-3.1190 -0.5378 0.0212" euler="0 0 4.6142" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_29_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.4773 -0.5025 0.0212" euler="0 0 4.6142" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_30" type="box" size="0.0466 0.18 0.0006" pos="-3.3000 -0.6000 0.0206" euler="0 0 -1.5708" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_30_l" type="box" size="0.0466 0.0125 0.0004" pos="-3.1200 -0.6000 0.0212" euler="0 0 -1.5708" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_30_r" type="box" size="0.0466 0.0125 0.0004" pos="-3.4800 -0.6000 0.0212" euler="0 0 -1.5708" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_31" type="box" size="0.0413 0.18 0.0006" pos="-3.2982 -0.6798 0.0206" euler="0 0 4.8106" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_31_l" type="box" size="0.0413 0.0125 0.0004" pos="-3.1190 -0.6622 0.0212" euler="0 0 4.8106" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_31_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.4773 -0.6975 0.0212" euler="0 0 4.8106" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_32" type="box" size="0.0413 0.18 0.0006" pos="-3.2836 -0.7529 0.0206" euler="0 0 5.0069" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_32_l" type="box" size="0.0413 0.0125 0.0004" pos="-3.1114 -0.7007 0.0212" euler="0 0 5.0069" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_32_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.4559 -0.8052 0.0212" euler="0 0 5.0069" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_33" type="box" size="0.0413 0.18 0.0006" pos="-3.2551 -0.8217 0.0206" euler="0 0 5.2033" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_33_l" type="box" size="0.0413 0.0125 0.0004" pos="-3.0964 -0.7369 0.0212" euler="0 0 5.2033" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_33_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.4139 -0.9066 0.0212" euler="0 0 5.2033" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_34" type="box" size="0.0413 0.18 0.0006" pos="-3.2137 -0.8837 0.0206" euler="0 0 5.3996" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_34_l" type="box" size="0.0413 0.0125 0.0004" pos="-3.0746 -0.7695 0.0212" euler="0 0 5.3996" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_34_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.3529 -0.9979 0.0212" euler="0 0 5.3996" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_35" type="box" size="0.2355 0.18 0.0006" pos="-3.0250 -1.0750 0.0206" euler="0 0 -0.7854" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_35_l" type="box" size="0.2355 0.0125 0.0004" pos="-2.8977 -0.9477 0.0212" euler="0 0 -0.7854" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_35_r" type="box" size="0.2355 0.0125 0.0004" pos="-3.1523 -1.2023 0.0212" euler="0 0 -0.7854" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_36" type="box" size="0.0413 0.18 0.0006" pos="-2.8337 -1.2637 0.0206" euler="0 0 -0.6872" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_36_l" type="box" size="0.0413 0.0125 0.0004" pos="-2.7195 -1.1246 0.0212" euler="0 0 -0.6872" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_36_r" type="box" size="0.0413 0.0125 0.0004" pos="-2.9479 -1.4029 0.0212" euler="0 0 -0.6872" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_37" type="box" size="0.0413 0.18 0.0006" pos="-2.7717 -1.3051 0.0206" euler="0 0 -0.4909" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_37_l" type="box" size="0.0413 0.0125 0.0004" pos="-2.6869 -1.1464 0.0212" euler="0 0 -0.4909" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_37_r" type="box" size="0.0413 0.0125 0.0004" pos="-2.8566 -1.4639 0.0212" euler="0 0 -0.4909" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_38" type="box" size="0.0413 0.18 0.0006" pos="-2.7029 -1.3336 0.0206" euler="0 0 -0.2945" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_38_l" type="box" size="0.0413 0.0125 0.0004" pos="-2.6507 -1.1614 0.0212" euler="0 0 -0.2945" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_38_r" type="box" size="0.0413 0.0125 0.0004" pos="-2.7552 -1.5059 0.0212" euler="0 0 -0.2945" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_39" type="box" size="0.0413 0.18 0.0006" pos="-2.6298 -1.3482 0.0206" euler="0 0 -0.0982" material="glare" contype="0" conaffinity="0"/>
+    <geom name="edge_39_l" type="box" size="0.0413 0.0125 0.0004" pos="-2.6122 -1.1690 0.0212" euler="0 0 -0.0982" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_39_r" type="box" size="0.0413 0.0125 0.0004" pos="-2.6475 -1.5273 0.0212" euler="0 0 -0.0982" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_40" type="box" size="2.1003 0.18 0.0006" pos="-0.4963 -1.3500 0.0206" euler="0 0 0.0000" material="glare" contype="0" conaffinity="0"/>
+    <geom name="edge_40_l" type="box" size="2.1003 0.0125 0.0004" pos="-0.4963 -1.1700 0.0212" euler="0 0 0.0000" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_40_r" type="box" size="2.1003 0.0125 0.0004" pos="-0.4963 -1.5300 0.0212" euler="0 0 0.0000" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_41" type="box" size="0.3461 0.18 0.0006" pos="1.9421 -1.3500 0.0206" euler="0 0 0.0000" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_41_l" type="box" size="0.3461 0.0125 0.0004" pos="1.9421 -1.1700 0.0212" euler="0 0 0.0000" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_41_r" type="box" size="0.3461 0.0125 0.0004" pos="1.9421 -1.5300 0.0212" euler="0 0 0.0000" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_42" type="box" size="0.0366 0.18 0.0006" pos="2.3167 -1.3514 0.0206" euler="0 0 -0.0858" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_42_l" type="box" size="0.0366 0.0125 0.0004" pos="2.3321 -1.1721 0.0212" euler="0 0 -0.0858" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_42_r" type="box" size="0.0366 0.0125 0.0004" pos="2.3013 -1.5307 0.0212" euler="0 0 -0.0858" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_43" type="box" size="0.0366 0.18 0.0006" pos="2.3809 -1.3625 0.0206" euler="0 0 -0.2573" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_43_l" type="box" size="0.0366 0.0125 0.0004" pos="2.4267 -1.1884 0.0212" euler="0 0 -0.2573" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_43_r" type="box" size="0.0366 0.0125 0.0004" pos="2.3351 -1.5366 0.0212" euler="0 0 -0.2573" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_44" type="box" size="0.2841 0.18 0.0006" pos="2.6757 -1.4663 0.0206" euler="0 0 -0.3430" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_44_l" type="box" size="0.2841 0.0125 0.0004" pos="2.7363 -1.2968 0.0212" euler="0 0 -0.3430" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_44_r" type="box" size="0.2841 0.0125 0.0004" pos="2.6152 -1.6359 0.0212" euler="0 0 -0.3430" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_45" type="box" size="0.0419 0.18 0.0006" pos="2.9745 -1.5751 0.0206" euler="0 0 -0.4429" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_45_l" type="box" size="0.0419 0.0125 0.0004" pos="3.0517 -1.4124 0.0212" euler="0 0 -0.4429" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_45_r" type="box" size="0.0419 0.0125 0.0004" pos="2.8974 -1.7377 0.0212" euler="0 0 -0.4429" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_46" type="box" size="0.0419 0.18 0.0006" pos="3.0394 -1.6142 0.0206" euler="0 0 -0.6425" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_46_l" type="box" size="0.0419 0.0125 0.0004" pos="3.1472 -1.4701 0.0212" euler="0 0 -0.6425" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_46_r" type="box" size="0.0419 0.0125 0.0004" pos="2.9315 -1.7583 0.0212" euler="0 0 -0.6425" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_47" type="box" size="0.0419 0.18 0.0006" pos="3.0952 -1.6654 0.0206" euler="0 0 -0.8422" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_47_l" type="box" size="0.0419 0.0125 0.0004" pos="3.2295 -1.5455 0.0212" euler="0 0 -0.8422" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_47_r" type="box" size="0.0419 0.0125 0.0004" pos="2.9609 -1.7852 0.0212" euler="0 0 -0.8422" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_48" type="box" size="0.1560 0.18 0.0006" pos="3.2084 -1.8178 0.0206" euler="0 0 -0.9420" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_48_l" type="box" size="0.1560 0.0125 0.0004" pos="3.3540 -1.7120 0.0212" euler="0 0 -0.9420" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_48_r" type="box" size="0.1560 0.0125 0.0004" pos="3.0628 -1.9237 0.0212" euler="0 0 -0.9420" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_49" type="box" size="0.0419 0.18 0.0006" pos="3.3185 -1.9724 0.0206" euler="0 0 -1.0416" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_49_l" type="box" size="0.0419 0.0125 0.0004" pos="3.4739 -1.8816 0.0212" euler="0 0 -1.0416" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_49_r" type="box" size="0.0419 0.0125 0.0004" pos="3.1632 -2.0633 0.0212" euler="0 0 -1.0416" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_50" type="box" size="0.0419 0.18 0.0006" pos="3.3500 -2.0412 0.0206" euler="0 0 -1.2409" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_50_l" type="box" size="0.0419 0.0125 0.0004" pos="3.5203 -1.9828 0.0212" euler="0 0 -1.2409" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_50_r" type="box" size="0.0419 0.0125 0.0004" pos="3.1797 -2.0995 0.0212" euler="0 0 -1.2409" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_51" type="box" size="0.0419 0.18 0.0006" pos="3.3673 -2.1148 0.0206" euler="0 0 -1.4401" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_51_l" type="box" size="0.0419 0.0125 0.0004" pos="3.5457 -2.0913 0.0212" euler="0 0 -1.4401" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_51_r" type="box" size="0.0419 0.0125 0.0004" pos="3.1888 -2.1382 0.0212" euler="0 0 -1.4401" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_52" type="box" size="0.0419 0.18 0.0006" pos="3.3696 -2.1903 0.0206" euler="0 0 -1.6394" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_52_l" type="box" size="0.0419 0.0125 0.0004" pos="3.5492 -2.2026 0.0212" euler="0 0 -1.6394" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_52_r" type="box" size="0.0419 0.0125 0.0004" pos="3.1900 -2.1780 0.0212" euler="0 0 -1.6394" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_53" type="box" size="0.0419 0.18 0.0006" pos="3.3570 -2.2648 0.0206" euler="0 0 -1.8386" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_53_l" type="box" size="0.0419 0.0125 0.0004" pos="3.5305 -2.3125 0.0212" euler="0 0 -1.8386" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_53_r" type="box" size="0.0419 0.0125 0.0004" pos="3.1834 -2.2172 0.0212" euler="0 0 -1.8386" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_54" type="box" size="0.0419 0.18 0.0006" pos="3.3298 -2.3354 0.0206" euler="0 0 -2.0379" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_54_l" type="box" size="0.0419 0.0125 0.0004" pos="3.4905 -2.4164 0.0212" euler="0 0 -2.0379" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_54_r" type="box" size="0.0419 0.0125 0.0004" pos="3.1691 -2.2543 0.0212" euler="0 0 -2.0379" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_55" type="box" size="0.1354 0.18 0.0006" pos="3.2405 -2.4791 0.0206" euler="0 0 -2.1375" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_55_l" type="box" size="0.1354 0.0125 0.0004" pos="3.3924 -2.5758 0.0212" euler="0 0 -2.1375" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_55_r" type="box" size="0.1354 0.0125 0.0004" pos="3.0887 -2.3825 0.0212" euler="0 0 -2.1375" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_56" type="box" size="0.0354 0.18 0.0006" pos="3.1521 -2.6158 0.0206" euler="0 0 -2.2202" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_56_l" type="box" size="0.0354 0.0125 0.0004" pos="3.2954 -2.7246 0.0212" euler="0 0 -2.2202" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_56_r" type="box" size="0.0354 0.0125 0.0004" pos="3.0087 -2.5069 0.0212" euler="0 0 -2.2202" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_57" type="box" size="0.0354 0.18 0.0006" pos="3.1101 -2.6624 0.0206" euler="0 0 -2.3854" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_57_l" type="box" size="0.0354 0.0125 0.0004" pos="3.2336 -2.7934 0.0212" euler="0 0 -2.3854" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_57_r" type="box" size="0.0354 0.0125 0.0004" pos="2.9866 -2.5315 0.0212" euler="0 0 -2.3854" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_58" type="box" size="0.0354 0.18 0.0006" pos="3.0611 -2.7016 0.0206" euler="0 0 -2.5507" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_58_l" type="box" size="0.0354 0.0125 0.0004" pos="3.1614 -2.8510 0.0212" euler="0 0 -2.5507" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_58_r" type="box" size="0.0354 0.0125 0.0004" pos="2.9608 -2.5521 0.0212" euler="0 0 -2.5507" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_59" type="box" size="0.0354 0.18 0.0006" pos="3.0063 -2.7321 0.0206" euler="0 0 -2.7159" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_59_l" type="box" size="0.0354 0.0125 0.0004" pos="3.0806 -2.8960 0.0212" euler="0 0 -2.7159" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_59_r" type="box" size="0.0354 0.0125 0.0004" pos="2.9320 -2.5681 0.0212" euler="0 0 -2.7159" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_60" type="box" size="0.2776 0.18 0.0006" pos="2.7196 -2.8359 0.0206" euler="0 0 -2.7986" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_60_l" type="box" size="0.2776 0.0125 0.0004" pos="2.7801 -3.0054 0.0212" euler="0 0 -2.7986" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_60_r" type="box" size="0.2776 0.0125 0.0004" pos="2.6591 -2.6663 0.0212" euler="0 0 -2.7986" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_61" type="box" size="0.0366 0.18 0.0006" pos="2.4309 -2.9375 0.0206" euler="0 0 -2.8843" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_61_l" type="box" size="0.0366 0.0125 0.0004" pos="2.4767 -3.1116 0.0212" euler="0 0 -2.8843" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_61_r" type="box" size="0.0366 0.0125 0.0004" pos="2.3851 -2.7634 0.0212" euler="0 0 -2.8843" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_62" type="box" size="0.0366 0.18 0.0006" pos="2.3667 -2.9486 0.0206" euler="0 0 -3.0558" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_62_l" type="box" size="0.0366 0.0125 0.0004" pos="2.3821 -3.1279 0.0212" euler="0 0 -3.0558" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_62_r" type="box" size="0.0366 0.0125 0.0004" pos="2.3513 -2.7693 0.0212" euler="0 0 -3.0558" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_63" type="box" size="2.7674 0.18 0.0006" pos="-0.4292 -2.9500 0.0206" euler="0 0 3.1416" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_63_l" type="box" size="2.7674 0.0125 0.0004" pos="-0.4292 -3.1300 0.0212" euler="0 0 3.1416" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_63_r" type="box" size="2.7674 0.0125 0.0004" pos="-0.4292 -2.7700 0.0212" euler="0 0 3.1416" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_64" type="box" size="0.0413 0.18 0.0006" pos="-3.2298 -2.9482 0.0206" euler="0 0 -3.2398" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_64_l" type="box" size="0.0413 0.0125 0.0004" pos="-3.2475 -3.1273 0.0212" euler="0 0 -3.2398" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_64_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.2122 -2.7690 0.0212" euler="0 0 -3.2398" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_65" type="box" size="0.0413 0.18 0.0006" pos="-3.3029 -2.9336 0.0206" euler="0 0 -3.4361" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_65_l" type="box" size="0.0413 0.0125 0.0004" pos="-3.3552 -3.1059 0.0212" euler="0 0 -3.4361" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_65_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.2507 -2.7614 0.0212" euler="0 0 -3.4361" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_66" type="box" size="0.0413 0.18 0.0006" pos="-3.3717 -2.9051 0.0206" euler="0 0 -3.6325" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_66_l" type="box" size="0.0413 0.0125 0.0004" pos="-3.4566 -3.0639 0.0212" euler="0 0 -3.6325" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_66_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.2869 -2.7464 0.0212" euler="0 0 -3.6325" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_67" type="box" size="0.0413 0.18 0.0006" pos="-3.4337 -2.8637 0.0206" euler="0 0 -3.8288" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_67_l" type="box" size="0.0413 0.0125 0.0004" pos="-3.5479 -3.0029 0.0212" euler="0 0 -3.8288" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_67_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.3195 -2.7246 0.0212" euler="0 0 -3.8288" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_68" type="box" size="0.3769 0.18 0.0006" pos="-3.7250 -2.5750 0.0206" euler="0 0 2.3562" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_68_l" type="box" size="0.3769 0.0125 0.0004" pos="-3.8523 -2.7023 0.0212" euler="0 0 2.3562" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_68_r" type="box" size="0.3769 0.0125 0.0004" pos="-3.5977 -2.4477 0.0212" euler="0 0 2.3562" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_69" type="box" size="0.0413 0.18 0.0006" pos="-4.0137 -2.2837 0.0206" euler="0 0 -4.0252" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_69_l" type="box" size="0.0413 0.0125 0.0004" pos="-4.1529 -2.3979 0.0212" euler="0 0 -4.0252" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_69_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.8746 -2.1695 0.0212" euler="0 0 -4.0252" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_70" type="box" size="0.0413 0.18 0.0006" pos="-4.0551 -2.2217 0.0206" euler="0 0 -4.2215" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_70_l" type="box" size="0.0413 0.0125 0.0004" pos="-4.2139 -2.3066 0.0212" euler="0 0 -4.2215" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_70_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.8964 -2.1369 0.0212" euler="0 0 -4.2215" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_71" type="box" size="0.0413 0.18 0.0006" pos="-4.0836 -2.1529 0.0206" euler="0 0 -4.4179" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_71_l" type="box" size="0.0413 0.0125 0.0004" pos="-4.2559 -2.2052 0.0212" euler="0 0 -4.4179" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_71_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.9114 -2.1007 0.0212" euler="0 0 -4.4179" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_72" type="box" size="0.0413 0.18 0.0006" pos="-4.0982 -2.0798 0.0206" euler="0 0 -4.6142" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_72_l" type="box" size="0.0413 0.0125 0.0004" pos="-4.2773 -2.0975 0.0212" euler="0 0 -4.6142" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_72_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.9190 -2.0622 0.0212" euler="0 0 -4.6142" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_73" type="box" size="1.7966 0.18 0.0006" pos="-4.1000 -0.2500 0.0206" euler="0 0 1.5708" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_73_l" type="box" size="1.7966 0.0125 0.0004" pos="-4.2800 -0.2500 0.0212" euler="0 0 1.5708" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_73_r" type="box" size="1.7966 0.0125 0.0004" pos="-3.9200 -0.2500 0.0212" euler="0 0 1.5708" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_74" type="box" size="0.0413 0.18 0.0006" pos="-4.0982 1.5798 0.0206" euler="0 0 1.4726" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_74_l" type="box" size="0.0413 0.0125 0.0004" pos="-4.2773 1.5975 0.0212" euler="0 0 1.4726" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_74_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.9190 1.5622 0.0212" euler="0 0 1.4726" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_75" type="box" size="0.0413 0.18 0.0006" pos="-4.0836 1.6529 0.0206" euler="0 0 1.2763" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_75_l" type="box" size="0.0413 0.0125 0.0004" pos="-4.2559 1.7052 0.0212" euler="0 0 1.2763" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_75_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.9114 1.6007 0.0212" euler="0 0 1.2763" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_76" type="box" size="0.0413 0.18 0.0006" pos="-4.0551 1.7217 0.0206" euler="0 0 1.0799" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_76_l" type="box" size="0.0413 0.0125 0.0004" pos="-4.2139 1.8066 0.0212" euler="0 0 1.0799" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_76_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.8964 1.6369 0.0212" euler="0 0 1.0799" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_77" type="box" size="0.0413 0.18 0.0006" pos="-4.0137 1.7837 0.0206" euler="0 0 0.8836" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_77_l" type="box" size="0.0413 0.0125 0.0004" pos="-4.1529 1.8979 0.0212" euler="0 0 0.8836" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_77_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.8746 1.6695 0.0212" euler="0 0 0.8836" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_78" type="box" size="0.3062 0.18 0.0006" pos="-3.7750 2.0250 0.0206" euler="0 0 0.7854" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_78_l" type="box" size="0.3062 0.0125 0.0004" pos="-3.9023 2.1523 0.0212" euler="0 0 0.7854" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_78_r" type="box" size="0.3062 0.0125 0.0004" pos="-3.6477 1.8977 0.0212" euler="0 0 0.7854" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_79" type="box" size="0.0413 0.18 0.0006" pos="-3.5337 2.2637 0.0206" euler="0 0 0.6872" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_79_l" type="box" size="0.0413 0.0125 0.0004" pos="-3.6479 2.4029 0.0212" euler="0 0 0.6872" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_79_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.4195 2.1246 0.0212" euler="0 0 0.6872" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_80" type="box" size="0.0413 0.18 0.0006" pos="-3.4717 2.3051 0.0206" euler="0 0 0.4909" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_80_l" type="box" size="0.0413 0.0125 0.0004" pos="-3.5566 2.4639 0.0212" euler="0 0 0.4909" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_80_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.3869 2.1464 0.0212" euler="0 0 0.4909" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_81" type="box" size="0.0413 0.18 0.0006" pos="-3.4029 2.3336 0.0206" euler="0 0 0.2945" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_81_l" type="box" size="0.0413 0.0125 0.0004" pos="-3.4552 2.5059 0.0212" euler="0 0 0.2945" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_81_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.3507 2.1614 0.0212" euler="0 0 0.2945" material="line" contype="0" conaffinity="0"/>
+    <geom name="road_82" type="box" size="0.0413 0.18 0.0006" pos="-3.3298 2.3482 0.0206" euler="0 0 0.0982" material="road" contype="0" conaffinity="0"/>
+    <geom name="edge_82_l" type="box" size="0.0413 0.0125 0.0004" pos="-3.3475 2.5273 0.0212" euler="0 0 0.0982" material="line" contype="0" conaffinity="0"/>
+    <geom name="edge_82_r" type="box" size="0.0413 0.0125 0.0004" pos="-3.3122 2.1690 0.0212" euler="0 0 0.0982" material="line" contype="0" conaffinity="0"/>
+    <geom name="start_line" type="box" size="0.02 0.18 0.0004" pos="-2.8500 2.3500 0.0216" euler="0 0 0.0000" material="line" contype="0" conaffinity="0"/>
+    <geom name="choke_wall_l" type="box" size="0.2249999999999992 0.03 0.05" pos="1.4750 2.5300 0.07" euler="0 0 0.0000" rgba="0.13 0.13 0.15 1"/>
+    <geom name="choke_wall_r" type="box" size="0.2249999999999992 0.03 0.05" pos="1.4750 2.1700 0.07" euler="0 0 0.0000" rgba="0.13 0.13 0.15 1"/>
+    <geom name="tunnel1_wall_l" type="box" size="0.6500000000000004 0.015 0.1" pos="-1.3000 -0.0950 0.12" euler="0 0 3.1416" rgba="0.55 0.55 0.6 1"/>
+    <geom name="tunnel1_wall_r" type="box" size="0.6500000000000004 0.015 0.1" pos="-1.3000 0.4950 0.12" euler="0 0 3.1416" rgba="0.55 0.55 0.6 1"/>
+    <geom name="tunnel1_roof_l" type="box" size="0.6500000000000004 0.09 0.006" pos="-1.3000 -0.0100 0.228" euler="0 0 3.1416" rgba="0.55 0.55 0.6 1"/>
+    <geom name="tunnel1_roof_r" type="box" size="0.6500000000000004 0.09 0.006" pos="-1.3000 0.4100 0.228" euler="0 0 3.1416" rgba="0.55 0.55 0.6 1"/>
+    <geom name="tunnel2_wall_l" type="box" size="0.7249999999999996 0.015 0.1" pos="-0.0750 -3.2450 0.12" euler="0 0 3.1416" rgba="0.55 0.55 0.6 1"/>
+    <geom name="tunnel2_wall_r" type="box" size="0.7249999999999996 0.015 0.1" pos="-0.0750 -2.6550 0.12" euler="0 0 3.1416" rgba="0.55 0.55 0.6 1"/>
+    <geom name="tunnel2_roof" type="box" size="0.7249999999999996 0.31 0.006" pos="-0.0750 -2.9500 0.228" euler="0 0 3.1416" rgba="0.13 0.13 0.15 1"/>
+    <body name="dyn_obstacle" mocap="true" pos="0.300 0.200 0.02"
+            quat="-0.70711 0 0 0.70711">
+      <geom name="dyn_obstacle_rear_wheel" type="cylinder" size="0.045 0.008"
+            pos="-0.07 0 0.045" zaxis="0 1 0" rgba="0.06 0.06 0.06 1"/>
+      <geom name="dyn_obstacle_front_wheel" type="cylinder" size="0.045 0.008"
+            pos="0.07 0 0.045" zaxis="0 1 0" rgba="0.06 0.06 0.06 1"/>
+      <geom name="dyn_obstacle_frame_rear" type="capsule" size="0.008"
+            fromto="-0.07 0 0.045 -0.02 0 0.115" rgba="0.85 0.20 0.08 1"/>
+      <geom name="dyn_obstacle_frame_front" type="capsule" size="0.008"
+            fromto="0.07 0 0.045 -0.02 0 0.115" rgba="0.85 0.20 0.08 1"/>
+      <geom name="dyn_obstacle_frame_base" type="capsule" size="0.008"
+            fromto="-0.07 0 0.045 0.07 0 0.045" rgba="0.85 0.20 0.08 1"/>
+      <geom name="dyn_obstacle_seat" type="box" size="0.025 0.018 0.006"
+            pos="-0.025 0 0.125" rgba="0.08 0.08 0.08 1"/>
+      <geom name="dyn_obstacle_handlebar" type="box" size="0.01 0.055 0.006"
+            pos="0.055 0 0.125" rgba="0.12 0.12 0.12 1"/>
     </body>
-    <body name="t2_obstacle" mocap="true" pos="-1.300 -0.960 0.09">
+    <body name="t2_obstacle" mocap="true" pos="-0.100 -2.950 0.09">
       <geom name="t2_obstacle_box" type="box" size="0.055 0.055 0.07" rgba="0.3 0.55 0.8 1"/>
     </body>
     <body name="stop_cube" mocap="true" pos="0 -5 -1">
-      <geom name="stop_cube_box" type="box" size="0.1 0.1 0.1" rgba="0.95 0.95 0.95 1"/>
+      <geom name="stop_cube_box" type="box" size="0.0750 0.0675 0.0750" rgba="0.95 0.95 0.95 1"/>
     </body>
+    <geom name="traffic_pole" type="cylinder" size="0.012 0.14" pos="-4.4000 0.8000 0.16" rgba="0.15 0.15 0.15 1" contype="0" conaffinity="0"/>
+    <geom name="traffic_housing" type="box" size="0.025 0.035 0.09" pos="-4.4000 0.8000 0.36" euler="0 0 1.5708" rgba="0.08 0.08 0.08 1" contype="0" conaffinity="0"/>
+    <geom name="traffic_red" type="sphere" size="0.018" pos="-4.4000 0.8000 0.415" rgba="0.20 0.01 0.01 1" contype="0" conaffinity="0"/>
+    <geom name="traffic_yellow" type="sphere" size="0.018" pos="-4.4000 0.8000 0.36" rgba="0.18 0.12 0.01 1" contype="0" conaffinity="0"/>
+    <geom name="traffic_green" type="sphere" size="0.018" pos="-4.4000 0.8000 0.305" rgba="0.01 0.20 0.01 1" contype="0" conaffinity="0"/>
+    <geom name="traffic_stop_line" type="box" size="0.018 0.18 0.0005" pos="-4.1000 0.4800 0.0217" euler="0 0 1.5708" rgba="0.95 0.25 0.18 1" contype="0" conaffinity="0"/>
 
     <include file="car.xml"/>
   </worldbody>
