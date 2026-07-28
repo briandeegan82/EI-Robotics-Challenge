@@ -5,7 +5,7 @@ course. The real event runs on physical Rubik Pi vehicles; this repo lets teams
 learn the course, prototype vision and control, and practice before hardware day.
 
 The track follows the supplied multi-level diagram: a paved strip with white
-edges winds through every challenge section in a roughly 9.4 m × 6.7 m
+edges winds through every challenge section in a roughly 9.7 m × 6.7 m
 simulation footprint:
 
 ```
