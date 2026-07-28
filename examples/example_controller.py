@@ -71,7 +71,9 @@ class ExampleController:
         # --- dynamic bicycle: it continuously crosses the road ------------
         # (real robot: detect it with the camera). Hold ~0.45 m short until a
         # gap opens on the far side and is still widening, then latch a commit
-        # and drive straight through before it swings back.
+        # and drive through, hugging the open side for lateral margin (a
+        # centered car barely clears the bike at its peak, so if we arrive
+        # fast just as it starts to close we would otherwise clip it).
         dyn = p["dyn_obstacle"]
         approach = track.in_range(s, DYN_ZONE)
         if approach and not self.bike_cleared:
@@ -83,6 +85,8 @@ class ExampleController:
                 target_speed = min(target_speed, float(np.clip(1.8 * gap, 0.0, CRUISE)))
         elif not approach:
             self.bike_cleared = False           # re-arm once past the obstacle
+        if self.bike_cleared:
+            offset = -np.sign(dyn["lateral"]) * 0.09
         self.prev_bike_lat = dyn["lateral"]
 
         # --- functional traffic light -------------------------------------
