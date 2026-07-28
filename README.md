@@ -4,6 +4,12 @@ A MuJoCo simulation of the **EI Robotics Challenge** autonomous line-following
 course. The real event runs on physical Rubik Pi vehicles; this repo lets teams
 learn the course, prototype vision and control, and practice before hardware day.
 
+![view_camera.py screenshot](images/img_01.png)
+
+*`python examples/view_camera.py`: the onboard camera with the line-detection
+overlay — green = detected road, cyan = the column the follower steers toward —
+beside a behind-the-car chase view.*
+
 The track follows the supplied multi-level diagram: a paved strip with white
 edges winds through every challenge section in a roughly 9.7 m × 6.7 m
 simulation footprint:
@@ -118,6 +124,17 @@ The course is deliberately hostile to naive vision:
 - the tunnel mouth mixes bright and dark content in one frame,
 - the roadside signal follows a 6 s green / 2 s yellow / 4 s red cycle, and
   its starting phase randomizes each `reset()`.
+
+The overlay makes these hazards concrete — the checkerboard gate and the dark
+tunnel each break a fixed brightness threshold in a different way:
+
+![Checkerboard gate onboard view](images/img_02.png)
+
+*Passing through the checkerboard gate — high-contrast structure laid over the road.*
+
+![Tunnel #2 onboard view](images/img_03.png)
+
+*Approaching the dark tunnel #2, with the blue obstacle box inside.*
 
 **`info["privileged"]`** — ground truth (pose, arc length, lateral offset,
 obstacle positions) that the real robot will **not** have. Use it to get
