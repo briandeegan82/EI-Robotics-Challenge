@@ -133,8 +133,8 @@ def build() -> str:
 
   <visual>
     <!-- offscreen framebuffer: must be >= the largest render requested.
-         600x600 onboard camera; view_camera.py's chase panel is 800x600. -->
-    <global offwidth="800" offheight="640"/>
+         800x450 onboard camera; view_camera.py's chase panel is 600x450. -->
+    <global offwidth="800" offheight="480"/>
     <!-- weak headlight so the tunnels are genuinely dark on camera -->
     <headlight diffuse="0.12 0.12 0.12" ambient="0.22 0.22 0.22"/>
   </visual>

@@ -27,11 +27,11 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from gauntlet import GauntletEnv, track
 
-CAM_W, CAM_H = 600, 600
+CAM_W, CAM_H = 800, 450    # 16:9, Raspberry Pi Camera v3 aspect ratio
 # Only the bottom rows: the floor from ~0.15 to ~0.5 m ahead of the bumper.
 # A taller ROI previews the track further out but is easily fooled at the
 # tunnel mouths, where sunlit walls outshine the line — try it and see.
-ROI_TOP = 425          # ~0.71 of the way down the frame
+ROI_TOP = 319          # ~0.71 of the way down the frame
 BASE_SPEED = 1.1        # m/s
 DARK_SPEED = 0.7        # m/s when the image is too dark to be confident
 MAX_SPEED = 2.2

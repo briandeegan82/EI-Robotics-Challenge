@@ -289,10 +289,11 @@ class GauntletEnv:
         if self._viewer.is_running():
             self._viewer.sync()
 
-    def camera_image(self, camera: str = "onboard", width: int = 600, height: int = 600):
+    def camera_image(self, camera: str = "onboard", width: int = 800, height: int = 450):
         """Return an RGB image (H, W, 3 uint8) from the onboard camera.
 
-        Defaults to 600x600. This is the competition's primary sensor.
+        Defaults to 800x450 — 16:9, matching the Raspberry Pi Camera v3 aspect
+        ratio. This is the competition's primary sensor.
         Requires OpenGL; on a headless machine set MUJOCO_GL=egl or osmesa.
 
         Note: the renderer is created once at the first call and reuses that
