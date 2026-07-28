@@ -39,11 +39,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from challenge import ChallengeEnv, track
 
 CAM_W, CAM_H = 800, 450    # 16:9, Raspberry Pi Camera v3 aspect ratio
-# Only the bottom rows: the floor just ahead of the bumper. Keeping it near
-# makes the road-center estimate steady where it matters most (the choke, the
-# tunnel mouths): a taller ROI sees further but is pulled off by the road
-# *beyond* a narrow gap and by upcoming curves — try raising it and watch.
-ROI_TOP = 380          # ~0.84 of the way down the frame
+# A tall strip of floor ahead of the bumper. The ROI must look far enough
+# ahead to SEE a turn coming: too near (e.g. 380, just in front of the bumper)
+# and the road curves away *above* the strip, so the car keeps reading
+# "straight" and drives off the first bend. Reaching to ~mid-frame lets it
+# anticipate the course's turns; the trade-off is a noisier road-center
+# estimate through narrow gaps (the choke) — try raising/lowering it and watch.
+ROI_TOP = 240          # ~0.53 of the way down the frame
 BASE_SPEED = 1.1        # m/s
 DARK_SPEED = 0.7        # m/s when the road can't be found confidently
 MAX_SPEED = 2.2
