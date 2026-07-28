@@ -29,27 +29,31 @@ class ExtendedCourseTests(unittest.TestCase):
             self.assertGreaterEqual(self.env.model.geom(name).id, 0)
 
     def test_signal_cycle(self):
-        # Pin the phase to check the 6 s green / 4 s red boundaries directly.
+        # Pin the phase to check the 6 s green / 2 s yellow / 4 s red boundaries.
         self.env._traffic_phase = 0.0
         self.assertEqual(self.env._traffic_light_state(0.0), "green")
         self.assertEqual(self.env._traffic_light_state(5.99), "green")
-        self.assertEqual(self.env._traffic_light_state(6.0), "red")
-        self.assertEqual(self.env._traffic_light_state(9.99), "red")
-        self.assertEqual(self.env._traffic_light_state(10.0), "green")
+        self.assertEqual(self.env._traffic_light_state(6.0), "yellow")
+        self.assertEqual(self.env._traffic_light_state(7.99), "yellow")
+        self.assertEqual(self.env._traffic_light_state(8.0), "red")
+        self.assertEqual(self.env._traffic_light_state(11.99), "red")
+        self.assertEqual(self.env._traffic_light_state(12.0), "green")
 
     def test_signal_phase_randomizes_across_resets(self):
+        from challenge.env import TRAFFIC_CYCLE
+
         phases = set()
         for seed in range(10):
             self.env.reset(seed=seed)
-            self.assertTrue(0.0 <= self.env._traffic_phase < 10.0)
+            self.assertTrue(0.0 <= self.env._traffic_phase < TRAFFIC_CYCLE)
             phases.add(round(self.env._traffic_phase, 6))
         self.assertGreater(len(phases), 1)
 
     def test_signal_phase_shifts_the_cycle(self):
-        # A phase offset moves the green->red boundary earlier by that offset.
+        # A phase offset moves the green->yellow boundary earlier by that offset.
         self.env._traffic_phase = 2.0
         self.assertEqual(self.env._traffic_light_state(3.99), "green")
-        self.assertEqual(self.env._traffic_light_state(4.0), "red")
+        self.assertEqual(self.env._traffic_light_state(4.0), "yellow")
 
     def test_lap_completion_ends_attempt_immediately(self):
         self.env._progress = track.TOTAL + 0.30
@@ -87,12 +91,12 @@ class ExtendedCourseTests(unittest.TestCase):
 
     def test_crossing_on_red_is_penalized_once(self):
         self.env.reset(seed=0)
-        self.env._traffic_phase = 0.0   # t=7.0 falls in the red window
+        self.env._traffic_phase = 0.0   # t=9.0 falls in the red window
         before = track.TRAFFIC_STOP_S - 0.05
         after = track.TRAFFIC_STOP_S + 0.05
         x, y, _ = track.path_point(after)
         self.env.data.qpos[0:2] = [x, y]
-        self.env.data.time = 7.0
+        self.env.data.time = 9.0
         self.env._prev_s = before
         mujoco.mj_forward(self.env.model, self.env.data)
 
@@ -105,6 +109,23 @@ class ExtendedCourseTests(unittest.TestCase):
         ]
         self.assertEqual(len(violations), 1)
         self.assertEqual(violations[0]["points"], -10)
+
+    def test_crossing_on_yellow_is_not_penalized(self):
+        self.env.reset(seed=0)
+        self.env._traffic_phase = 0.0   # t=7.0 falls in the yellow window
+        before = track.TRAFFIC_STOP_S - 0.05
+        after = track.TRAFFIC_STOP_S + 0.05
+        x, y, _ = track.path_point(after)
+        self.env.data.qpos[0:2] = [x, y]
+        self.env.data.time = 7.0
+        self.env._prev_s = before
+        mujoco.mj_forward(self.env.model, self.env.data)
+
+        self.assertEqual(self.env._traffic_light_state(7.0), "yellow")
+        _, _, _, _, info = self.env.step([0.0, 0.0])
+        self.assertFalse(
+            any(e["event"] == "traffic_light_violation" for e in info["events"])
+        )
 
     def test_leaving_track_penalizes_without_terminating(self):
         self.env.reset(seed=0)

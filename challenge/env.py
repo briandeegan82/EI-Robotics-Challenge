@@ -66,8 +66,10 @@ WHEEL_RADIUS = 0.032
 CAR_Z = 0.052
 CONTROL_HZ = 50
 LAP_TIME_LIMIT = 120.0   # s to finish the lap
-TRAFFIC_CYCLE = 10.0
 TRAFFIC_GREEN_TIME = 6.0
+TRAFFIC_YELLOW_TIME = 2.0   # green -> yellow -> red transition warning
+TRAFFIC_RED_TIME = 4.0
+TRAFFIC_CYCLE = TRAFFIC_GREEN_TIME + TRAFFIC_YELLOW_TIME + TRAFFIC_RED_TIME
 
 # dynamic bicycle behaviour
 DYN_MOVE_SPAN = 0.22     # moving mode: slides across +/- this lateral range
@@ -255,8 +257,8 @@ class ChallengeEnv:
 
         # ---- stalling (official: hesitation > 2 s) ---------------------
         light_gap = track.s_delta(track.TRAFFIC_STOP_S, s)
-        waiting_at_red = (
-            self._traffic_light_state(t) == "red"
+        waiting_at_signal = (
+            self._traffic_light_state(t) in ("red", "yellow")
             and -0.05 < light_gap < 0.8
         )
         # Suppress the stall penalty across the whole region where a controller
@@ -272,7 +274,7 @@ class ChallengeEnv:
             )
             and abs(self._dyn_lat) < 0.20
         )
-        if waiting_at_red or waiting_for_bicycle:
+        if waiting_at_signal or waiting_for_bicycle:
             self._stall_since = None
         elif speed > 0.1:
             self._moved = True
@@ -365,14 +367,18 @@ class ChallengeEnv:
         self._update_traffic_light(t)
 
     def _traffic_light_state(self, t: float) -> str:
-        return ("green" if (t + self._traffic_phase) % TRAFFIC_CYCLE < TRAFFIC_GREEN_TIME
-                else "red")
+        phase = (t + self._traffic_phase) % TRAFFIC_CYCLE
+        if phase < TRAFFIC_GREEN_TIME:
+            return "green"
+        if phase < TRAFFIC_GREEN_TIME + TRAFFIC_YELLOW_TIME:
+            return "yellow"
+        return "red"
 
     def _update_traffic_light(self, t: float):
         state = self._traffic_light_state(t)
         colours = {
             "red": [1.0, 0.02, 0.02, 1.0] if state == "red" else [0.20, 0.01, 0.01, 1.0],
-            "yellow": [0.18, 0.12, 0.01, 1.0],
+            "yellow": [1.0, 0.75, 0.02, 1.0] if state == "yellow" else [0.18, 0.12, 0.01, 1.0],
             "green": [0.02, 1.0, 0.02, 1.0] if state == "green" else [0.01, 0.20, 0.01, 1.0],
         }
         for name, geom_id in self._traffic_geoms.items():

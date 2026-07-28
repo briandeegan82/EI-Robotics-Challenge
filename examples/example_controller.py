@@ -91,12 +91,13 @@ class ExampleController:
 
         # --- functional traffic light -------------------------------------
         # Only the current colour is known (no timer), so approach slowly
-        # enough to still honour a late flip to red: brake to a hold on red,
+        # enough to still honour a late flip to red: brake to a hold on
+        # yellow/red (yellow precedes red and crossing on red is penalized),
         # creep on green.
         light = p["traffic_light"]
         light_gap = track.s_delta(light["stop_s"], s)
         if 0 < light_gap < 1.3:
-            if light["state"] == "red":
+            if light["state"] in ("red", "yellow"):
                 target_speed = min(target_speed, float(np.clip(1.6 * (light_gap - 0.04), 0.0, 0.6)))
             else:
                 # creep the last stretch so a flip to red right at the line can
