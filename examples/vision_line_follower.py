@@ -38,14 +38,25 @@ MAX_SPEED = 2.2
 
 
 class VisionLineFollower:
+    # ROI rows (start, end) the pipeline actually looks at, exposed so
+    # view_camera.py can draw exactly what the algorithm sees.
+    ROI = (ROI_TOP, CAM_H)
+
     def __init__(self, env):
         self.env = env
         self.err = 0.0            # last normalized line offset [-1, 1]
         self.line_seen = False
+        # debug state for visualization (view_camera.py)
+        self.frame = None        # last camera frame (CAM_H, CAM_W, 3)
+        self.mask = None         # line pixels within the ROI, or None
+        self.cx = None           # detected line column, or None
 
     def process_frame(self):
         """Update self.err from the camera. Returns True if the line was found."""
         rgb = self.env.camera_image(width=CAM_W, height=CAM_H)
+        self.frame = rgb
+        self.mask = None
+        self.cx = None
         roi = rgb[ROI_TOP:, :, :].mean(axis=2)          # grayscale floor strip
 
         # The line is brighter than the floor around it — but the absolute
@@ -65,6 +76,8 @@ class VisionLineFollower:
 
         cols = np.nonzero(mask)[1]
         cx = cols.mean()
+        self.mask = mask
+        self.cx = float(cx)
         self.err = (cx - CAM_W / 2) / (CAM_W / 2)
         self.line_seen = True
         return True

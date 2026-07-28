@@ -12,6 +12,10 @@ dependencies = [
     "numpy>=1.24",
 ]
 
+[project.optional-dependencies]
+# camera visualization (examples/view_camera.py)
+viz = ["opencv-python>=4.8"]
+
 [tool.setuptools.packages.find]
 include = ["gauntlet*"]
 

@@ -47,6 +47,10 @@ python examples/run_example_controller.py
 # the real thing: camera-based line following
 python examples/vision_line_follower.py
 
+# SEE what the camera sees, with the line-detection overlay
+pip install -e ".[viz]"        # one-time: adds OpenCV
+python examples/view_camera.py
+
 # headless (no graphics window; camera rendering still needs OpenGL)
 MUJOCO_GL=osmesa python examples/vision_line_follower.py --headless --seed 3
 ```
@@ -109,8 +113,12 @@ print(env.score.summary())
 
 **Camera** — `env.camera_image()` returns the onboard RGB frame. This is the
 competition's primary sensor: line following, obstacle detection, and ranging
-the stop cube are all meant to be done from it. The course is deliberately
-hostile to naive vision, just like the real event:
+the stop cube are all meant to be done from it. Run
+`python examples/view_camera.py` to *watch* that feed live with the
+line-detection overlay drawn on it (green = detected line pixels, cyan =
+the column the follower steers toward) next to a chase view — the fastest way
+to see why a follower drifts. The course is deliberately hostile to naive
+vision, just like the real event:
 
 - the **glare curve** washes the floor out to near-white (fixed thresholds die
   here — see the median-relative threshold in `vision_line_follower.py`),
@@ -141,6 +149,8 @@ examples/
   run_example_controller.py  runs the reference controller
   vision_line_follower.py    camera-based line following — the real approach
                              (~18 s laps; obstacle/stop logic still privileged)
+  view_camera.py             live onboard-camera view with the line-detection
+                             overlay + chase view (needs the [viz] extra)
 ```
 
 ## Notes for teams

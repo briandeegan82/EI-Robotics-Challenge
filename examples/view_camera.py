@@ -1,0 +1,162 @@
+"""Watch what the onboard camera sees — with the line-detection overlay.
+
+    python examples/view_camera.py                 # vision follower drives
+    python examples/view_camera.py --seed 3
+    python examples/view_camera.py --record run.mp4 # also save the window to a file
+
+Opens one window with two panels:
+
+    LEFT   the onboard camera feed (exactly what the algorithm receives,
+           160x120), scaled up, with the vision pipeline drawn on top:
+             * green  = pixels the line detector kept (the mask)
+             * yellow = the region of interest it looks at
+             * cyan   = the detected line column it steers toward
+             * white  = image center (zero-error reference)
+    RIGHT  a third-person chase view of the car on the track.
+
+This is the tool to reach for when your follower drifts off the line: the
+overlay shows *why* — e.g. the mask goes empty in the dark tunnel, or the
+glare floor lights up as if it were line. Press q or Esc to quit.
+
+Requires OpenCV (pip install -e ".[viz]") and, on a headless machine,
+MUJOCO_GL=egl or MUJOCO_GL=osmesa for the offscreen rendering.
+"""
+
+import argparse
+import sys
+from pathlib import Path
+
+import cv2
+import mujoco
+import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from gauntlet import GauntletEnv
+from vision_line_follower import CAM_H, CAM_W, VisionLineFollower
+
+SCALE = 4                       # camera panel is CAM_W*SCALE x CAM_H*SCALE
+PANEL_H = CAM_H * SCALE         # both panels share this height
+
+
+def draw_overlay(follower):
+    """Return a BGR image of the camera frame with the pipeline drawn on it."""
+    frame = follower.frame
+    if frame is None:
+        return np.zeros((PANEL_H, CAM_W * SCALE, 3), np.uint8)
+
+    img = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR).astype(np.float32)
+    roi_top, roi_bot = follower.ROI
+
+    # tint the detected line pixels green
+    if follower.mask is not None:
+        band = img[roi_top:roi_bot]
+        green = np.zeros_like(band)
+        green[..., 1] = 255
+        m = follower.mask[..., None]
+        img[roi_top:roi_bot] = np.where(m, 0.45 * band + 0.55 * green, band)
+
+    img = cv2.resize(img.astype(np.uint8), (CAM_W * SCALE, CAM_H * SCALE),
+                     interpolation=cv2.INTER_NEAREST)
+
+    # ROI band edges (yellow)
+    cv2.line(img, (0, roi_top * SCALE), (CAM_W * SCALE, roi_top * SCALE), (0, 220, 220), 1)
+    # image center = zero-error reference (white)
+    cx0 = CAM_W * SCALE // 2
+    cv2.line(img, (cx0, roi_top * SCALE), (cx0, roi_bot * SCALE), (255, 255, 255), 1)
+    # detected line column (cyan)
+    if follower.cx is not None:
+        cx = int(follower.cx * SCALE)
+        cv2.line(img, (cx, roi_top * SCALE), (cx, roi_bot * SCALE), (255, 255, 0), 2)
+
+    status = "LINE" if follower.line_seen else "NO LINE"
+    color = (120, 255, 120) if follower.line_seen else (80, 80, 255)
+    cv2.putText(img, status, (8, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+    cv2.putText(img, "onboard camera", (8, PANEL_H - 12),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
+    return img
+
+
+def hud(chase_bgr, info, obs, err):
+    p = info["privileged"]
+    lines = [
+        f"phase   {info['phase']}",
+        f"lap     {p['progress'] / 14.91 * 100:5.1f}%",
+        f"speed   {obs[0]:4.2f} m/s",
+        f"line err{err:+5.2f}",
+        f"points  {info['score']}",
+        f"time    {info['time']:5.1f}s",
+    ]
+    for i, text in enumerate(lines):
+        cv2.putText(chase_bgr, text, (8, 22 + i * 22),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 3)
+        cv2.putText(chase_bgr, text, (8, 22 + i * 22),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (240, 240, 240), 1)
+    return chase_bgr
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--record", metavar="FILE", help="also write the window to an .mp4")
+    args = parser.parse_args()
+
+    env = GauntletEnv(render_mode=None)
+    obs, info = env.reset(seed=args.seed)
+    follower = VisionLineFollower(env)
+
+    chase = mujoco.Renderer(env.model, height=PANEL_H, width=int(PANEL_H * 4 / 3))
+    chase_cam = mujoco.MjvCamera()
+    chase_cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
+    chase_cam.trackbodyid = env.model.body("car").id
+    chase_cam.distance, chase_cam.elevation, chase_cam.azimuth = 1.4, -35, 180
+
+    writer = None
+    win = "Gauntlet camera view (q to quit)"
+    cv2.namedWindow(win, cv2.WINDOW_AUTOSIZE)
+
+    i, last_events = 0, 0
+    term = trunc = False
+    while True:
+        if i % 2 == 0:                         # vision at 25 Hz
+            follower.process_frame()
+        if not (term or trunc):
+            obs, _, term, trunc, info = env.step(follower.act(obs, info))
+            for e in info["events"][last_events:]:
+                print(f"[t={e['t']:6.2f}s] {e['event']} {e['detail']} ({e['points']:+d})")
+            last_events = len(info["events"])
+
+        cam_panel = draw_overlay(follower)
+        chase.update_scene(env.data, camera=chase_cam)
+        chase_panel = hud(cv2.cvtColor(chase.render(), cv2.COLOR_RGB2BGR), info, obs, follower.err)
+        window = np.hstack([cam_panel, chase_panel])
+
+        if args.record:
+            if writer is None:
+                h, w = window.shape[:2]
+                writer = cv2.VideoWriter(args.record, cv2.VideoWriter_fourcc(*"mp4v"), 25, (w, h))
+            writer.write(window)
+
+        cv2.imshow(win, window)
+        key = cv2.waitKey(1) & 0xFF
+        if key in (ord("q"), 27) or cv2.getWindowProperty(win, cv2.WND_PROP_VISIBLE) < 1:
+            break
+        if term or trunc:
+            # freeze on the final frame so the result stays on screen
+            print("\n" + env.score.summary())
+            if cv2.waitKey(2500) & 0xFF in (ord("q"), 27):
+                break
+            term = trunc = False
+            obs, info = env.reset()
+            follower = VisionLineFollower(env)
+            last_events = 0
+        i += 1
+
+    if writer is not None:
+        writer.release()
+        print(f"saved {args.record}")
+    cv2.destroyAllWindows()
+    env.close()
+
+
+if __name__ == "__main__":
+    main()
