@@ -128,7 +128,7 @@ class VisionLaneKeeper:
         # CHEAT: obey the simulated signal from privileged state.
         light = p["traffic_light"]
         light_gap = track.s_delta(light["stop_s"], s)
-        if light["state"] == "red" and 0 < light_gap < 0.9:
+        if light["state"] in ("red", "yellow") and 0 < light_gap < 0.9:
             speed = min(speed, float(np.clip(1.5 * (light_gap - 0.08), 0.0, 0.6)))
 
         if not self.road_seen:

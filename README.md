@@ -116,7 +116,8 @@ The course is deliberately hostile to naive vision:
 - the **checkerboard gate** adds high-contrast structure over the road,
 - **tunnel #2** is genuinely dark,
 - the tunnel mouth mixes bright and dark content in one frame,
-- the roadside signal follows a 6 s green / 4 s red cycle.
+- the roadside signal follows a 6 s green / 2 s yellow / 4 s red cycle, and
+  its starting phase randomizes each `reset()`.
 
 **`info["privileged"]`** — ground truth (pose, arc length, lateral offset,
 obstacle positions) that the real robot will **not** have. Use it to get
