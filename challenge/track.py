@@ -13,12 +13,16 @@ import math
 
 # Diagram-proportioned centerline.  It starts just after the top-left corner,
 # then follows the sketch clockwise through two stacked return straights.
+# The turn after the gate is a 180 deg switchback. It is spread over four
+# gentle 45 deg fillets (no near-degenerate connector straight) and bulged out
+# to x=-3.6, while the outer return straight sits further left at x=-4.4, so the
+# two legs stay far enough apart that a camera does not see both at once.
 WAYPOINTS = (
     (-3.45, 2.35), (3.15, 2.35), (3.85, 1.65), (3.85, 0.75),
-    (3.30, 0.20), (-2.70, 0.20), (-3.30, -0.40), (-3.30, -0.80),
-    (-2.75, -1.35), (2.35, -1.35), (3.05, -1.60), (3.45, -2.15),
-    (3.10, -2.70), (2.40, -2.95), (-3.35, -2.95), (-4.10, -2.20),
-    (-4.10, 1.70),
+    (3.30, 0.20), (-3.15, 0.20), (-3.60, -0.25), (-3.60, -0.90),
+    (-3.15, -1.35), (2.35, -1.35), (3.05, -1.60), (3.45, -2.15),
+    (3.10, -2.70), (2.40, -2.95), (-3.35, -2.95), (-4.40, -2.20),
+    (-4.40, 1.70),
 )
 CORNER_RADIUS = 0.38
 
@@ -180,8 +184,8 @@ GATE_S = _s_at(-1.30, 0.20)          # checkerboard semicircle arch
 SHINE = (_s_at(-2.70, -1.35), _s_at(1.60, -1.35))
 TUNNEL_2 = (_s_at(0.65, -2.95), _s_at(-0.80, -2.95))
 T2_OBSTACLE_S = _s_at(-0.10, -2.95)
-TRAFFIC_LIGHT_S = _s_at(-4.10, 0.80)
-TRAFFIC_STOP_S = _s_at(-4.10, 0.48)
+TRAFFIC_LIGHT_S = _s_at(-4.40, 0.80)
+TRAFFIC_STOP_S = _s_at(-4.40, 0.48)
 
 # Expanded footprint used by the generated floor and overview cameras.
 MIN_X = min(point[0] for point in WAYPOINTS) - 0.7
