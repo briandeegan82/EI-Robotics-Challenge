@@ -136,6 +136,11 @@ def shine_light() -> str:
     a real light lined up with the road -- low-angled and bright, like
     driving toward a low sun -- interacting with that material's own
     (modest) specular response, rather than a patch of baked-in shininess.
+
+    Wide cutoff + low exponent spread the beam into a broad, even flood
+    rather than a tight hotspot, and gentle attenuation lets it stay bright
+    over the straight's full length, so the washed-out area is large enough
+    to actually obscure the lane edge lines, not just glint off them.
     """
     lx, ly, heading = track.path_point(track.SHINE[1] + 0.2)
     tx, ty = math.cos(heading), math.sin(heading)
@@ -144,8 +149,8 @@ def shine_light() -> str:
     return (
         f'<light name="shine_light" pos="{pos[0]:.4f} {pos[1]:.4f} {pos[2]:.4f}" '
         f'dir="{aim[0]:.4f} {aim[1]:.4f} {aim[2]:.4f}" '
-        f'diffuse="2.2 2.1 1.9" specular="2.4 2.4 2.2" ambient="0 0 0" '
-        f'attenuation="1 0 0.15" cutoff="40" exponent="3" castshadow="false"/>'
+        f'diffuse="3.6 3.4 3.0" specular="4.0 4.0 3.6" ambient="0 0 0" '
+        f'attenuation="1 0 0.05" cutoff="65" exponent="1" castshadow="false"/>'
     )
 
 
