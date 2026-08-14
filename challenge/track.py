@@ -205,7 +205,7 @@ SHINE = (_s_at(-2.70, -1.35), _s_at(1.60, -1.35))
 HATCH = (_s_at(-4.40, -1.40), _s_at(-4.40, -0.40))
 TUNNEL_2 = (_s_at(0.65, -2.95), _s_at(-0.80, -2.95))
 T2_OBSTACLE_S = _s_at(-0.10, -2.95)
-TRAFFIC_LIGHT_S = _s_at(-4.40, 0.80)
+TRAFFIC_LIGHT_S = _s_at(-4.40, 1.30)
 TRAFFIC_STOP_S = _s_at(-4.40, 0.48)
 
 # Expanded footprint used by the generated floor and overview cameras.

@@ -537,15 +537,18 @@ def build() -> str:
 
     # Roadside traffic signal. The lenses are visual-only collision-wise;
     # env.py switches their emission/colour and judges the stop-line crossing.
+    # Mounted low (a car-scale fixture, not a full-size overhead signal) so
+    # it stays within the onboard camera's view -- which sits only 0.075 m
+    # off the ground -- once the car has stopped close beneath it.
     lx, ly, light_heading = offset_pose(track.TRAFFIC_LIGHT_S, W + 0.12)
     body.append(
-        f'<geom name="traffic_pole" type="cylinder" size="0.012 0.14" '
-        f'pos="{lx:.4f} {ly:.4f} 0.16" rgba="0.15 0.15 0.15 1" '
+        f'<geom name="traffic_pole" type="cylinder" size="0.012 0.10" '
+        f'pos="{lx:.4f} {ly:.4f} 0.10" rgba="0.15 0.15 0.15 1" '
         f'contype="0" conaffinity="0"/>'
     )
     body.append(
         f'<geom name="traffic_housing" type="box" size="0.025 0.035 0.09" '
-        f'pos="{lx:.4f} {ly:.4f} 0.36" euler="0 0 {light_heading:.4f}" '
+        f'pos="{lx:.4f} {ly:.4f} 0.22" euler="0 0 {light_heading:.4f}" '
         f'rgba="0.08 0.08 0.08 1" contype="0" conaffinity="0"/>'
     )
     # Each lamp also carries a real <light> (off by default; env.py drives
@@ -565,9 +568,9 @@ def build() -> str:
     lens_x = lx - tx * 0.038
     lens_y = ly - ty * 0.038
     for name, z, colour in (
-        ("red", 0.415, "0.20 0.01 0.01 1"),
-        ("yellow", 0.360, "0.18 0.12 0.01 1"),
-        ("green", 0.305, "0.01 0.20 0.01 1"),
+        ("red", 0.275, "0.20 0.01 0.01 1"),
+        ("yellow", 0.220, "0.18 0.12 0.01 1"),
+        ("green", 0.165, "0.01 0.20 0.01 1"),
     ):
         body.append(
             f'<geom name="traffic_{name}" type="sphere" size="0.018" '

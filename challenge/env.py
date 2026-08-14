@@ -68,10 +68,15 @@ WHEEL_RADIUS = 0.032
 CAR_Z = 0.052
 CONTROL_HZ = 50
 LAP_TIME_LIMIT = 120.0   # s to finish the lap
-TRAFFIC_GREEN_TIME = 6.0
-TRAFFIC_YELLOW_TIME = 2.0   # green -> yellow -> red transition warning
-TRAFFIC_RED_TIME = 4.0
-TRAFFIC_CYCLE = TRAFFIC_GREEN_TIME + TRAFFIC_YELLOW_TIME + TRAFFIC_RED_TIME
+# The signal starts red and only turns (permanently) green once the car has
+# sat stopped at the line for TRAFFIC_WAIT_SECONDS -- every competitor pays
+# exactly the same toll, rather than some getting lucky with a pre-timed
+# cycle and others eating a near-full-cycle wait. TRAFFIC_STOP_SPEED reuses
+# the stall detector's "basically stopped" threshold, and TRAFFIC_WAIT_ZONE
+# is how close to the line (in arc-length) the stop has to be to count.
+TRAFFIC_WAIT_SECONDS = 5.0
+TRAFFIC_STOP_SPEED = 0.03
+TRAFFIC_WAIT_ZONE = (-0.05, 0.5)
 
 # dynamic bicycle behaviour
 DYN_MOVE_SPAN = 0.22     # moving mode: slides across +/- this lateral range
@@ -207,11 +212,10 @@ class ChallengeEnv:
                 self.model.geom_rgba[geom_id] = colour
         self._fork_side = None
 
-        # traffic light: randomize where in the green/red cycle the attempt
-        # starts, so the phase the car meets at the stop line varies per run
-        # and can't be memorized from a fixed lap time. Drawn last so it does
-        # not perturb the bicycle/obstacle randomization for a given seed.
-        self._traffic_phase = float(self._rng.uniform(0, TRAFFIC_CYCLE))
+        # traffic light: always starts red; see step()'s wait-timer logic for
+        # when it switches to green.
+        self._traffic_state = "red"
+        self._traffic_wait_since = None
 
         self.score = ScoreKeeper()
         self.lap_time = None
@@ -256,12 +260,26 @@ class ChallengeEnv:
         terminated = truncated = False
 
         # ---- traffic light ---------------------------------------------
+        # Red until the car has sat stopped at the line for
+        # TRAFFIC_WAIT_SECONDS, then permanently green -- a fixed toll every
+        # competitor pays, instead of a pre-timed cycle some get lucky on.
+        if self._traffic_state == "red":
+            light_gap = track.s_delta(track.TRAFFIC_STOP_S, s)
+            waiting_here = TRAFFIC_WAIT_ZONE[0] < light_gap < TRAFFIC_WAIT_ZONE[1]
+            if waiting_here and speed < TRAFFIC_STOP_SPEED:
+                if self._traffic_wait_since is None:
+                    self._traffic_wait_since = t
+                elif t - self._traffic_wait_since >= TRAFFIC_WAIT_SECONDS:
+                    self._traffic_state = "green"
+            else:
+                self._traffic_wait_since = None
+
         crossed_stop_line = (
             ds > 0
             and 0 <= track.s_delta(track.TRAFFIC_STOP_S, prev_s) <= ds + 1e-6
         )
         if (crossed_stop_line and not self._traffic_violated
-                and self._traffic_light_state(t) == "red"):
+                and self._traffic_state == "red"):
             self.score.traffic_light_violation(t)
             self._traffic_violated = True
 
@@ -300,7 +318,7 @@ class ChallengeEnv:
         # ---- stalling (official: hesitation > 2 s) ---------------------
         light_gap = track.s_delta(track.TRAFFIC_STOP_S, s)
         waiting_at_signal = (
-            self._traffic_light_state(t) in ("red", "yellow")
+            self._traffic_state == "red"
             and -0.05 < light_gap < 0.8
         )
         # Suppress the stall penalty across the whole region where a controller
@@ -418,18 +436,13 @@ class ChallengeEnv:
             0,
             np.sin(bicycle_heading / 2),
         ]
-        self._update_traffic_light(t)
+        self._update_traffic_light()
 
-    def _traffic_light_state(self, t: float) -> str:
-        phase = (t + self._traffic_phase) % TRAFFIC_CYCLE
-        if phase < TRAFFIC_GREEN_TIME:
-            return "green"
-        if phase < TRAFFIC_GREEN_TIME + TRAFFIC_YELLOW_TIME:
-            return "yellow"
-        return "red"
-
-    def _update_traffic_light(self, t: float):
-        state = self._traffic_light_state(t)
+    def _update_traffic_light(self):
+        # the amber lamp is a physical fixture (a real 3-light signal head)
+        # but this course only ever drives it red<->green -- see step()'s
+        # wait-timer logic for self._traffic_state.
+        state = self._traffic_state
         colours = {
             "red": [1.0, 0.02, 0.02, 1.0] if state == "red" else [0.20, 0.01, 0.01, 1.0],
             "yellow": [1.0, 0.75, 0.02, 1.0] if state == "yellow" else [0.18, 0.12, 0.01, 1.0],
@@ -505,7 +518,7 @@ class ChallengeEnv:
                 "t2_side": self.t2_side,
                 "fork_direction": self.fork_direction,
                 "traffic_light": {
-                    "state": self._traffic_light_state(self.data.time),
+                    "state": self._traffic_state,
                     "stop_s": track.TRAFFIC_STOP_S,
                 },
             },

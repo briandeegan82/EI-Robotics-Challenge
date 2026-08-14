@@ -105,10 +105,11 @@ class ExampleController:
         self.prev_bike_lat = dyn["lateral"]
 
         # --- functional traffic light -------------------------------------
-        # Only the current colour is known (no timer), so approach slowly
-        # enough to still honour a late flip to red: brake to a hold on
-        # yellow/red (yellow precedes red and crossing on red is penalized),
-        # creep on green.
+        # The signal starts red and only turns (permanently) green once the
+        # car has sat stopped at the line for a few seconds -- the same
+        # fixed toll every attempt, not a lucky pre-timed cycle. Brake to a
+        # full stop on red and hold; the environment handles the wait and
+        # flips the state once it's satisfied. Creep off once green.
         light = p["traffic_light"]
         light_gap = track.s_delta(light["stop_s"], s)
         if 0 < light_gap < 1.3:
