@@ -128,30 +128,44 @@ def road_and_edges() -> list[str]:
     return g
 
 
-def shine_light() -> str:
-    """High-intensity spotlight beyond the SHINE straight, aimed back down it.
+def shine_light() -> list[str]:
+    """Floodlight tower beyond the SHINE straight, aimed back down it.
 
     The straight's paving stays the plain "road" material (no special-cased
     surface); the reflective streak the car drives toward instead comes from
-    a real light lined up with the road -- low-angled and bright, like
-    driving toward a low sun -- interacting with that material's own
-    (modest) specular response, rather than a patch of baked-in shininess.
+    a real light interacting with that material's own (modest) specular
+    response, rather than a patch of baked-in shininess. The <light> itself
+    has no visible geometry in MuJoCo, so this also builds the pole, housing,
+    and lamp lens it's mounted in -- positioned and aimed together, roadside
+    like the traffic signal rather than planted in the lane -- so the glare
+    visibly comes from somewhere instead of thin air.
 
     Wide cutoff + low exponent spread the beam into a broad, even flood
     rather than a tight hotspot, and gentle attenuation lets it stay bright
     over the straight's full length, so the washed-out area is large enough
     to actually obscure the lane edge lines, not just glint off them.
     """
-    lx, ly, heading = track.path_point(track.SHINE[1] + 0.2)
+    px, py, heading = offset_pose(track.SHINE[1] + 0.2, W + 0.22)
     tx, ty = math.cos(heading), math.sin(heading)
-    pos = (lx, ly, 0.45)
-    aim = (-tx, -ty, -0.22)
-    return (
-        f'<light name="shine_light" pos="{pos[0]:.4f} {pos[1]:.4f} {pos[2]:.4f}" '
+    tower_h = 0.85
+    lamp = (px - tx * 0.045, py - ty * 0.045, tower_h)
+    aim = (-tx, -ty, -0.30)
+    rotation = f'euler="0 0 {heading:.4f}"'
+    return [
+        f'<geom name="shine_pole" type="cylinder" size="0.02 {tower_h / 2:.4f}" '
+        f'pos="{px:.4f} {py:.4f} {tower_h / 2:.4f}" rgba="0.15 0.15 0.15 1" '
+        f'contype="0" conaffinity="0"/>',
+        f'<geom name="shine_housing" type="box" size="0.045 0.065 0.03" '
+        f'pos="{px:.4f} {py:.4f} {tower_h:.4f}" {rotation} '
+        f'rgba="0.12 0.12 0.12 1" contype="0" conaffinity="0"/>',
+        f'<geom name="shine_lamp" type="sphere" size="0.032" '
+        f'pos="{lamp[0]:.4f} {lamp[1]:.4f} {lamp[2]:.4f}" '
+        f'rgba="1.0 0.97 0.85 1" contype="0" conaffinity="0"/>',
+        f'<light name="shine_light" pos="{lamp[0]:.4f} {lamp[1]:.4f} {lamp[2]:.4f}" '
         f'dir="{aim[0]:.4f} {aim[1]:.4f} {aim[2]:.4f}" '
         f'diffuse="3.6 3.4 3.0" specular="4.0 4.0 3.6" ambient="0 0 0" '
-        f'attenuation="1 0 0.05" cutoff="65" exponent="1" castshadow="false"/>'
-    )
+        f'attenuation="1 0 0.05" cutoff="65" exponent="1" castshadow="false"/>',
+    ]
 
 
 HATCH_COLOR = 'rgba="0.95 0.82 0.12 1"'
@@ -490,7 +504,7 @@ def build() -> str:
                     f'pos="{wx:.4f} {wy:.4f} 0.07" euler="0 0 {ch_heading:.4f}" {DARK_WALL}/>')
 
     body += checkerboard_gate("gate", track.GATE_S)
-    body.append(shine_light())
+    body += shine_light()
     body += cross_hatch("hatch", track.HATCH)
     body += tunnel("tunnel2", track.TUNNEL_2)
 
