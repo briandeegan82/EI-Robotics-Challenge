@@ -1011,6 +1011,11 @@
     <geom name="gate_54" type="box" size="0.0391 0.0235 0.0210" pos="-1.2775 -0.1379 0.0381" quat="-0.47118 -0.52725 0.52725 0.47118" rgba="0.08 0.08 0.08 1"/>
     <geom name="gate_55" type="box" size="0.0391 0.0235 0.0210" pos="-1.3225 -0.1379 0.0381" quat="-0.47118 -0.52725 0.52725 0.47118" rgba="0.92 0.92 0.92 1"/>
     <light name="shine_light" pos="1.8000 -1.3500 0.4500" dir="-1.0000 -0.0000 -0.2200" diffuse="2.2 2.1 1.9" specular="2.4 2.4 2.2" ambient="0 0 0" attenuation="1 0 0.15" cutoff="40" exponent="3" castshadow="false"/>
+    <geom name="hatch_0" type="box" size="0.2342 0.0180 0.0004" pos="-4.4000 -1.4000 0.0212" euler="0 0 2.3562" rgba="0.95 0.82 0.12 1" contype="0" conaffinity="0"/>
+    <geom name="hatch_1" type="box" size="0.2342 0.0180 0.0004" pos="-4.4000 -1.1500 0.0212" euler="0 0 2.3562" rgba="0.95 0.82 0.12 1" contype="0" conaffinity="0"/>
+    <geom name="hatch_2" type="box" size="0.2342 0.0180 0.0004" pos="-4.4000 -0.9000 0.0212" euler="0 0 2.3562" rgba="0.95 0.82 0.12 1" contype="0" conaffinity="0"/>
+    <geom name="hatch_3" type="box" size="0.2342 0.0180 0.0004" pos="-4.4000 -0.6500 0.0212" euler="0 0 2.3562" rgba="0.95 0.82 0.12 1" contype="0" conaffinity="0"/>
+    <geom name="hatch_4" type="box" size="0.2342 0.0180 0.0004" pos="-4.4000 -0.4000 0.0212" euler="0 0 2.3562" rgba="0.95 0.82 0.12 1" contype="0" conaffinity="0"/>
     <geom name="tunnel2_wall_l" type="box" size="0.7249999999999996 0.015 0.1" pos="-0.0750 -3.2450 0.12" euler="0 0 3.1416" rgba="0.13 0.13 0.15 1"/>
     <geom name="tunnel2_wall_r" type="box" size="0.7249999999999996 0.015 0.1" pos="-0.0750 -2.6550 0.12" euler="0 0 3.1416" rgba="0.13 0.13 0.15 1"/>
     <geom name="tunnel2_roof" type="box" size="0.7249999999999996 0.31 0.006" pos="-0.0750 -2.9500 0.228" euler="0 0 3.1416" rgba="0.13 0.13 0.15 1"/>

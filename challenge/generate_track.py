@@ -149,6 +149,36 @@ def shine_light() -> str:
     )
 
 
+HATCH_COLOR = 'rgba="0.95 0.82 0.12 1"'
+HATCH_HALF_WIDTH = 0.018   # stripe thickness
+HATCH_ANGLE = math.radians(45)
+HATCH_SPACING = 0.26        # centreline distance between successive stripes
+
+
+def cross_hatch(name: str, s_range: tuple[float, float]) -> list[str]:
+    """Diagonal "keep clear"-style hatch stripes painted across the road.
+
+    Purely a paint layer -- like the edge lines, non-collidable and drawn
+    above the plain road material -- so it adds visual clutter for the
+    camera pipeline without changing the drivable width.
+    """
+    lo, hi = s_range
+    length = track.s_delta(hi, lo)
+    n = max(round(length / HATCH_SPACING), 2)
+    half_len = W * math.sqrt(2) * 0.92
+    g = []
+    for i in range(n + 1):
+        s = lo + length * i / n
+        x, y, heading = track.path_point(s)
+        stripe_heading = heading + HATCH_ANGLE
+        g.append(
+            f'<geom name="{name}_{i}" type="box" size="{half_len:.4f} {HATCH_HALF_WIDTH:.4f} 0.0004" '
+            f'pos="{x:.4f} {y:.4f} {EDGE_Z}" euler="0 0 {stripe_heading:.4f}" '
+            f'{HATCH_COLOR} contype="0" conaffinity="0"/>'
+        )
+    return g
+
+
 def tunnel(name: str, s_range: tuple[float, float]) -> list[str]:
     """Dark tunnel walls (interior width 0.56 m, height 0.22 m) plus a full roof."""
     lo, hi = s_range
@@ -456,6 +486,7 @@ def build() -> str:
 
     body += checkerboard_gate("gate", track.GATE_S)
     body.append(shine_light())
+    body += cross_hatch("hatch", track.HATCH)
     body += tunnel("tunnel2", track.TUNNEL_2)
 
     # Mocap bodies: dynamic obstacle and tunnel #2 obstacle.
