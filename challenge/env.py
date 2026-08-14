@@ -77,11 +77,20 @@ DYN_MOVE_SPEED = 0.12    # m/s
 
 T2_OBSTACLE_LAT = 0.14   # closer to one wall, leaving a wider route on the free side
 
-# Off-track checks are suspended around obstacles because bypassing them
-# requires leaving the line.
+# fork sign: bright/dim lamp colours, same trick as the traffic light lenses
+FORK_BRIGHT = [1.0, 0.75, 0.05, 1.0]
+FORK_DIM = [0.20, 0.17, 0.06, 1.0]
+# lateral offset past which the car counts as having committed to a lane (the
+# divider wall forces this well before the fork's own lane centre at
+# track.FORK_LANE_OFFSET)
+FORK_COMMIT_LAT = 0.05
+
+# Off-track checks are suspended around obstacles/the fork because bypassing
+# them requires leaving the (single-lane) line.
 _NO_LANE_CHECK = (
     (track.DYN_OBSTACLE_S - 0.9, track.DYN_OBSTACLE_S + 0.9),
     (track.TUNNEL_2[0] - 0.5, track.TUNNEL_2[1] + 0.3),
+    (track.FORK_S[0] - 1.4, track.FORK_S[1] + 0.9),
 )
 
 
@@ -124,6 +133,10 @@ class ChallengeEnv:
             "yellow": gid("traffic_yellow"),
             "green": gid("traffic_green"),
         }
+        self._fork_geoms = {
+            "left": [gid("fork_sign_left_0"), gid("fork_sign_left_1")],
+            "right": [gid("fork_sign_right_0"), gid("fork_sign_right_1")],
+        }
         self._hazard_geoms = {
             gid(name): "obstacle"
             for name in (
@@ -139,7 +152,7 @@ class ChallengeEnv:
         }
         for i in range(self.model.ngeom):
             name = self.model.geom(i).name
-            if name.startswith(("choke_wall", "gate_", "tunnel2_")):
+            if name.startswith(("choke_wall", "gate_", "tunnel2_", "fork_divider")):
                 self._hazard_geoms[i] = "wall"
 
         self.reset(seed=0)
@@ -177,6 +190,15 @@ class ChallengeEnv:
             oy + ny * self.t2_side * T2_OBSTACLE_LAT,
             0.09,
         ]
+
+        # fork sign: randomize which lane is required this attempt, and light
+        # up the matching arrow (the other stays dim)
+        self.fork_direction = "left" if self._rng.integers(0, 2) == 0 else "right"
+        for direction, geom_ids in self._fork_geoms.items():
+            colour = FORK_BRIGHT if direction == self.fork_direction else FORK_DIM
+            for geom_id in geom_ids:
+                self.model.geom_rgba[geom_id] = colour
+        self._fork_side = None
 
         # traffic light: randomize where in the green/red cycle the attempt
         # starts, so the phase the car meets at the stop line varies per run
@@ -235,6 +257,19 @@ class ChallengeEnv:
                 and self._traffic_light_state(t) == "red"):
             self.score.traffic_light_violation(t)
             self._traffic_violated = True
+
+        # ---- lane fork ---------------------------------------------------
+        # The divider physically forces a side well before FORK_S[1], so by
+        # the time the car leaves the fork it has always committed to one
+        # lane; compare that lane against the sign shown this attempt.
+        if track.in_range(s, track.FORK_S) and self._fork_side is None and abs(lat) > FORK_COMMIT_LAT:
+            self._fork_side = "left" if lat > 0 else "right"
+        crossed_fork_end = (
+            ds > 0
+            and 0 <= track.s_delta(track.FORK_S[1], prev_s) <= ds + 1e-6
+        )
+        if crossed_fork_end and self._fork_side != self.fork_direction:
+            self.score.wrong_lane(t)
 
         # ---- collisions ------------------------------------------------
         for hazard in step_hazards - self._colliding:
@@ -438,6 +473,7 @@ class ChallengeEnv:
                 "progress": float(self._progress),
                 "dyn_obstacle": {"moving": self._dyn_moving, "lateral": self._dyn_lat},
                 "t2_side": self.t2_side,
+                "fork_direction": self.fork_direction,
                 "traffic_light": {
                     "state": self._traffic_light_state(self.data.time),
                     "stop_s": track.TRAFFIC_STOP_S,

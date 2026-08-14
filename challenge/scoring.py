@@ -8,6 +8,7 @@ Penalties:
     -2   leaving the track, once per incident until the car returns
     -5   hesitation/stalling more than 2 s
     -10  crossing the traffic-light stop line on red
+    -10  taking the lane the fork sign didn't select
     -15  contact with an obstacle
 
 Attempt-forfeiting fouls (no lap time recorded):
@@ -23,6 +24,7 @@ POINTS = {
     "off_track_minor": -2,
     "stall": -5,
     "traffic_light_violation": -10,
+    "wrong_lane": -10,
     "obstacle_contact": -15,
 }
 
@@ -67,6 +69,9 @@ class ScoreKeeper:
     def traffic_light_violation(self, t: float):
         self._add("traffic_light_violation", t, POINTS["traffic_light_violation"],
                   "crossed stop line on red")
+
+    def wrong_lane(self, t: float):
+        self._add("wrong_lane", t, POINTS["wrong_lane"], "took the lane the sign didn't select")
 
     def obstacle_contact(self, t: float):
         self._add("obstacle_contact", t, POINTS["obstacle_contact"])

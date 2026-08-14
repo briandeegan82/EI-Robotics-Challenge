@@ -176,6 +176,23 @@ def _s_at(x: float, y: float) -> float:
 # straight portions so the gate, tunnels, stop lines, and obstacle offsets
 # are stable.
 START_S = _s_at(-2.85, 2.35)
+
+# Lane fork: the road splits into a left and right lane separated by a
+# divider wall. A sign at FORK_SIGN_S randomly shows a left or right arrow
+# (see env.py's fork_direction); the car must take the indicated lane or a
+# penalty is applied when it exits the fork at FORK_S[1]. Kept well clear of
+# START_S so a controller has room to accelerate first, and clear of the
+# region tests probe just past the start line.
+FORK_SIGN_S = _s_at(-0.95, 2.35)
+FORK_S = (_s_at(-0.55, 2.35), _s_at(0.25, 2.35))
+FORK_LANE_HALF_WIDTH = 0.16
+FORK_DIVIDER_HALF_WIDTH = 0.04
+# Length of the widening/narrowing taper on each side of FORK_S: the road
+# flares from the single-lane width out to the two-lane fork width (and
+# back), instead of snapping to it at a square edge.
+FORK_TAPER = 0.35
+FORK_LANE_OFFSET = FORK_LANE_HALF_WIDTH + FORK_DIVIDER_HALF_WIDTH
+
 CHOKE = (_s_at(1.25, 2.35), _s_at(1.70, 2.35))
 DYN_OBSTACLE_S = _s_at(0.80, 0.20)
 BICYCLE_YAW_OFFSET = math.pi / 2

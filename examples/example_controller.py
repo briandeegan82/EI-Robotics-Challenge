@@ -11,8 +11,9 @@ replace those lookups with perception:
 
 Course plan:
     1. Pure-pursuit the white line; slow down for the choke point and gate.
-    2. Dodge the tunnel #2 obstacle to the free side.
-    3. Handle the dynamic bicycle, which continuously crosses the road: hold
+    2. Take the lane the fork sign indicates (a wall blocks the other one).
+    3. Dodge the tunnel #2 obstacle to the free side.
+    4. Handle the dynamic bicycle, which continuously crosses the road: hold
        short of it until a gap opens on the far side, then drive through.
 """
 
@@ -36,6 +37,13 @@ MAX_STEER = 0.55
 
 DYN_ZONE = (track.DYN_OBSTACLE_S - 1.0, track.DYN_OBSTACLE_S + 0.30)
 OFFSET_RESPONSE = 0.08
+# Lead distance for the fork lane change: the car's chassis extends ~0.11 m
+# ahead of the frenet reference point (its bumper reaches FORK_S[0] before
+# its center does), and the smoothed dodge_offset (OFFSET_RESPONSE=0.08 per
+# 50 Hz step) needs real distance to converge -- a short lead leaves the
+# offset well under the lane target when the bumper reaches the divider's
+# narrow entrance, clipping it. 1.3 m gives the filter time to settle.
+FORK_LEAD = 1.3
 
 
 class ExampleController:
@@ -59,6 +67,13 @@ class ExampleController:
             target_speed = CHOKE_SPEED
         if abs(track.s_delta(s, track.GATE_S)) < 0.8:
             target_speed = GATE_SPEED
+
+        # --- lane fork: take the side the sign indicates -------------------
+        # A divider wall blocks the middle, so start aiming for the lane
+        # centre a bit before the fork itself to avoid clipping its lead edge.
+        if track.in_range(s, (track.FORK_S[0] - FORK_LEAD, track.FORK_S[1])):
+            offset = track.FORK_LANE_OFFSET if p["fork_direction"] == "left" else -track.FORK_LANE_OFFSET
+            target_speed = min(target_speed, DODGE_SPEED)
 
         # --- tunnel #2 obstacle: dodge to the free side -------------------
         # (real robot: detect the box with the camera instead of p["t2_side"]).

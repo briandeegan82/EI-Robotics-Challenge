@@ -15,8 +15,9 @@ Opens one window with two panels:
     RIGHT  a third-person chase view of the car on the track.
 
 This is the tool to reach for when the car drifts toward an edge: the overlay
-shows *why* — e.g. the road mask collapses in the dark tunnel, or the glare
-curve blooms the whole strip toward white. Press q or Esc to quit.
+shows *why* — e.g. the road mask collapses in the dark tunnel, or the sheen
+straight's specular streak blooms part of the strip toward white. Press q or
+Esc to quit.
 
 Requires OpenCV (pip install -e ".[viz]") and, on a headless machine,
 MUJOCO_GL=egl or MUJOCO_GL=osmesa for the offscreen rendering.

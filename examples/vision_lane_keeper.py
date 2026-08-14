@@ -15,14 +15,15 @@ ONLY from the onboard camera. The pipeline here is deliberately simple:
        road centered in front of the car.
 
 It works, but leans on that brightness gap, which the course attacks on
-purpose: the high-glare curve blows the road out toward white, the
+purpose: a bright light at the end of the "sheen" straight throws a specular
+highlight down the road that blows part of it out toward white, the
 checkerboard gate adds high-contrast structure over the road, and the dark
 tunnel crushes it toward black. Making detection robust there (and reading
 the edge lines directly, rather than the whole road blob) is your project.
 
-Honesty note (marked CHEAT below): obstacle dodging still comes from
-info["privileged"], because doing it from vision is real project work, not
-example code. Replace it with camera logic.
+Honesty note (marked CHEAT below): obstacle dodging and reading the fork sign
+still come from info["privileged"], because doing it from vision is real
+project work, not example code. Replace it with camera logic.
 
 Requires OpenGL for offscreen rendering; on a headless machine run with
 MUJOCO_GL=egl or MUJOCO_GL=osmesa.
@@ -53,6 +54,18 @@ DODGE_RESPONSE = 0.08
 WHEELBASE = 0.15
 MAX_STEER_RAD = 0.55
 DODGE_LOOKAHEAD = 0.35
+# See example_controller.py's FORK_LEAD: the smoothed dodge_bias needs real
+# distance to converge before the car's bumper (which leads its frenet
+# reference point) reaches the divider's narrow entrance.
+FORK_LEAD = 1.3
+FORK_EXIT_FADE = 0.8
+FORK_SPEED = 0.7        # m/s through the fork -- more real time per metre to
+                         # steer gently, so recentring doesn't build up yaw
+# Aim inside the lane rather than dead-centre (track.FORK_LANE_OFFSET):
+# still clears the divider with margin, but the shorter swing keeps the
+# recentring steer (and the yaw it builds up) small enough for the choke
+# just past the fork to forgive.
+FORK_TARGET_OFFSET = 0.15
 
 
 class VisionLaneKeeper:
@@ -80,10 +93,11 @@ class VisionLaneKeeper:
 
         # The paved road is brighter than the dark ground beside it, at every
         # lighting level: road ~100 vs ground ~23 in daylight, ~30 vs ~6 in
-        # the dark tunnel, ~207 in the glare. A threshold placed a fixed
-        # FRACTION of the way from the darkest to the brightest pixel tracks
-        # all of those; a fixed absolute value would not. Naive, though —
-        # specular glare or a pale obstacle can masquerade as road.
+        # the dark tunnel, up to ~235 in the sheen straight's specular streak.
+        # A threshold placed a fixed FRACTION of the way from the darkest to
+        # the brightest pixel tracks all of those; a fixed absolute value
+        # would not. Naive, though — specular glare or a pale obstacle can
+        # masquerade as road.
         lo, hi = float(roi.min()), float(roi.max())
         if hi - lo < 20:                                 # no road/ground contrast
             self.road_seen = False
@@ -109,15 +123,36 @@ class VisionLaneKeeper:
         s = p["s"]
 
         offset_err = 0.0
-        tunnel_offset = None
+        path_offset = None
+        fork_blend = None   # None = hard cutover; else 0..1 weight toward pursuit_steer
         speed = BASE_SPEED
+
+        # CHEAT: read the fork sign from privileged info — replace with camera
+        # detection of the lit arrow. A divider splits the road view into two
+        # separate blobs here, so the brightness-centroid steer (self.err)
+        # would aim between them; pursue the commanded lane's centre instead.
+        # The divider's own circular-ease taper stays close to full width just
+        # past FORK_S[1] (zero slope where it meets the core), so both the
+        # target offset AND the steering law itself fade back to the camera
+        # estimate over FORK_EXIT_FADE, rather than snapping at the boundary
+        # -- a hard cutover leaves a residual yaw kick right where the wall
+        # is still substantial, which the choke just past it does not forgive.
+        fork_exit = track.FORK_S[1] + FORK_EXIT_FADE
+        if track.in_range(s, (track.FORK_S[0] - FORK_LEAD, fork_exit)):
+            target = FORK_TARGET_OFFSET if p["fork_direction"] == "left" else -FORK_TARGET_OFFSET
+            if s > track.FORK_S[1]:
+                fade = max(1.0 - track.s_delta(s, track.FORK_S[1]) / FORK_EXIT_FADE, 0.0)
+                target *= fade
+                fork_blend = fade
+            path_offset = target
+            speed = FORK_SPEED
 
         # CHEAT: dodge offsets from privileged info — replace with camera
         # detection of the obstacles (color blobs are a good start).
         if track.in_range(s, (track.TUNNEL_2[0] - 0.9, track.TUNNEL_2[1])):
             speed = 0.5                                  # slow for the dark tunnel
         if track.in_range(s, (track.TUNNEL_2[0] + 0.1, track.T2_OBSTACLE_S + 0.35)):
-            tunnel_offset = -p["t2_side"] * 0.10         # aim for the free half,
+            path_offset = -p["t2_side"] * 0.10         # aim for the free half,
             # once inside where the walls are parallel — swerving at the mouth
             # while still yawed from the curve clips the tunnel's leading edge
         # CHEAT: the bicycle continuously crosses the road; wait for a gap
@@ -138,25 +173,27 @@ class VisionLaneKeeper:
 
         self.dodge_bias += DODGE_RESPONSE * (offset_err - self.dodge_bias)
         steer = np.clip(-2.0 * (self.err + self.dodge_bias), -1, 1)
-        if tunnel_offset is not None:
-            # The camera's road estimate is skewed by the dark wall and block.
-            # Since obstacle avoidance already uses privileged information,
-            # pursue a point on the free half instead of adding a steering bias
-            # that can be cancelled by that skewed estimate.
+        if path_offset is not None:
+            # The camera's road-centroid estimate is unreliable here (skewed by
+            # the dark tunnel wall/block, or split into two blobs by the fork
+            # divider). Since both cases already use privileged information,
+            # pursue an explicit offset point instead of a steering bias that
+            # could be cancelled out by that skewed/split estimate.
             tx, ty, target_heading = track.path_point(s + DODGE_LOOKAHEAD)
-            tx += -np.sin(target_heading) * tunnel_offset
-            ty += np.cos(target_heading) * tunnel_offset
+            tx += -np.sin(target_heading) * path_offset
+            ty += np.cos(target_heading) * path_offset
             x, y, _ = p["car_pos"]
             yaw = p["car_yaw"]
             dx, dy = tx - x, ty - y
             local_x = np.cos(yaw) * dx + np.sin(yaw) * dy
             local_y = -np.sin(yaw) * dx + np.cos(yaw) * dy
             curvature = 2 * local_y / max(local_x**2 + local_y**2, 1e-6)
-            steer = np.clip(
+            pursuit_steer = np.clip(
                 np.arctan(WHEELBASE * curvature) / MAX_STEER_RAD,
                 -1,
                 1,
             )
+            steer = fork_blend * pursuit_steer + (1 - fork_blend) * steer if fork_blend is not None else pursuit_steer
         return np.array([steer, speed / MAX_SPEED])
 
 
