@@ -54,6 +54,7 @@ DODGE_RESPONSE = 0.08
 WHEELBASE = 0.15
 MAX_STEER_RAD = 0.55
 DODGE_LOOKAHEAD = 0.35
+STOP_MARGIN = 0.15    # brake target: chassis half-length (~0.11 m) + clearance
 # See example_controller.py's FORK_LEAD: the smoothed dodge_bias needs real
 # distance to converge before the car's bumper (which leads its frenet
 # reference point) reaches the divider's narrow entrance.
@@ -163,10 +164,14 @@ class VisionLaneKeeper:
                 speed = 0.0                              # wait for the gap
 
         # CHEAT: obey the simulated signal from privileged state.
+        # light_gap tracks the car's body origin, but the chassis extends
+        # ~0.11 m ahead of it -- braking to zero at gap=0.08 (as if the car
+        # were a point) left the front bumper straddling the line. STOP_MARGIN
+        # adds that overhang back plus a little clearance.
         light = p["traffic_light"]
         light_gap = track.s_delta(light["stop_s"], s)
         if light["state"] in ("red", "yellow") and 0 < light_gap < 0.9:
-            speed = min(speed, float(np.clip(1.5 * (light_gap - 0.08), 0.0, 0.6)))
+            speed = min(speed, float(np.clip(1.5 * (light_gap - STOP_MARGIN), 0.0, 0.6)))
 
         if not self.road_seen:
             speed = min(speed, DARK_SPEED)               # lost the road: ease off

@@ -34,6 +34,7 @@ DODGE_SPEED = 0.7
 CURVE_SPEED = 0.8
 MAX_SPEED = 2.2       # matches env throttle mapping
 MAX_STEER = 0.55
+STOP_MARGIN = 0.15    # brake target: chassis half-length (~0.11 m) + clearance
 
 DYN_ZONE = (track.DYN_OBSTACLE_S - 1.0, track.DYN_OBSTACLE_S + 0.30)
 OFFSET_RESPONSE = 0.08
@@ -114,7 +115,12 @@ class ExampleController:
         light_gap = track.s_delta(light["stop_s"], s)
         if 0 < light_gap < 1.3:
             if light["state"] in ("red", "yellow"):
-                target_speed = min(target_speed, float(np.clip(1.6 * (light_gap - 0.04), 0.0, 0.6)))
+                # light_gap tracks the car's body origin, but the chassis
+                # extends ~0.11 m ahead of it -- braking to zero at gap=0.04
+                # (as if the car were a point) left the front bumper roughly
+                # 0.07 m PAST the line. STOP_MARGIN adds that overhang back
+                # plus a little clearance so the car actually stops short.
+                target_speed = min(target_speed, float(np.clip(1.6 * (light_gap - STOP_MARGIN), 0.0, 0.6)))
             else:
                 # creep the last stretch so a flip to red right at the line can
                 # still be braked to a stop before crossing it
