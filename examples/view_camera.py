@@ -156,6 +156,7 @@ def main():
         writer.release()
         print(f"saved {args.record}")
     cv2.destroyAllWindows()
+    chase.close()
     env.close()
 
 

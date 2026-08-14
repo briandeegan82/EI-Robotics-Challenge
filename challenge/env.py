@@ -50,6 +50,8 @@ info dict:
 
 from __future__ import annotations
 
+import gc
+import time
 from pathlib import Path
 
 import mujoco
@@ -374,9 +376,21 @@ class ChallengeEnv:
         return self._renderer.render()
 
     def close(self):
-        if self._viewer is not None and self._viewer.is_running():
-            self._viewer.close()
+        if self._viewer is not None:
+            if self._viewer.is_running():
+                self._viewer.close()
+                # launch_passive's render loop runs on a daemon thread; close()
+                # only requests an exit, it doesn't block until the thread has
+                # actually torn down its GL context. If the process exits
+                # first, that teardown can race the interpreter shutdown and
+                # print a spurious (harmless) X/GLX error to stderr. Give it a
+                # moment to finish on its own terms.
+                deadline = time.monotonic() + 1.0
+                while self._viewer.is_running() and time.monotonic() < deadline:
+                    time.sleep(0.01)
         self._viewer = None
+        gc.collect()  # drop the Handle's C++ side synchronously, here, not at
+                       # an unpredictable later GC pass or interpreter exit
         if self._renderer is not None:
             self._renderer.close()
             self._renderer = None
