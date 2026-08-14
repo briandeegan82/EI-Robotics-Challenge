@@ -554,6 +554,12 @@ def build() -> str:
     # just being a flat-shaded sphere.
     nx, ny = -math.sin(light_heading), math.cos(light_heading)   # left normal
     lamp_aim = (-nx, -ny, -0.35)                                 # back toward the road
+    # the housing's road-facing half-width is 0.035; push each lens out past
+    # that face (radius 0.018 alone would sit entirely inside the box, so
+    # nothing would ever be visible no matter the colour) so it reads as a
+    # lit lens standing proud of the housing, facing oncoming traffic
+    lens_x = lx - nx * 0.048
+    lens_y = ly - ny * 0.048
     for name, z, colour in (
         ("red", 0.415, "0.20 0.01 0.01 1"),
         ("yellow", 0.360, "0.18 0.12 0.01 1"),
@@ -561,11 +567,11 @@ def build() -> str:
     ):
         body.append(
             f'<geom name="traffic_{name}" type="sphere" size="0.018" '
-            f'pos="{lx:.4f} {ly:.4f} {z}" rgba="{colour}" '
+            f'pos="{lens_x:.4f} {lens_y:.4f} {z}" rgba="{colour}" '
             f'contype="0" conaffinity="0"/>'
         )
         body.append(
-            f'<light name="traffic_{name}_light" pos="{lx:.4f} {ly:.4f} {z}" '
+            f'<light name="traffic_{name}_light" pos="{lens_x:.4f} {lens_y:.4f} {z}" '
             f'dir="{lamp_aim[0]:.4f} {lamp_aim[1]:.4f} {lamp_aim[2]:.4f}" '
             f'diffuse="0 0 0" specular="0 0 0" attenuation="1 0 6" '
             f'cutoff="60" castshadow="false"/>'
