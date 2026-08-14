@@ -552,14 +552,18 @@ def build() -> str:
     # both its geom colour and its light intensity together), so the active
     # colour actually casts a glow on the pole and road below it instead of
     # just being a flat-shaded sphere.
-    nx, ny = -math.sin(light_heading), math.cos(light_heading)   # left normal
-    lamp_aim = (-nx, -ny, -0.35)                                 # back toward the road
-    # the housing's road-facing half-width is 0.035; push each lens out past
-    # that face (radius 0.018 alone would sit entirely inside the box, so
-    # nothing would ever be visible no matter the colour) so it reads as a
-    # lit lens standing proud of the housing, facing oncoming traffic
-    lens_x = lx - nx * 0.048
-    lens_y = ly - ny * 0.048
+    #
+    # The housing's road-facing (tangent-perpendicular) half-width is 0.025 --
+    # its shortest dimension, so that's its "front" face -- and it should
+    # face back down the road at approaching traffic, i.e. along -tangent,
+    # not across the road. Push each lens out through that face (radius
+    # 0.018 alone would sit entirely inside the box, so nothing would ever
+    # be visible no matter the colour) so it stands proud facing oncoming
+    # cars head-on rather than off to the side.
+    tx, ty = math.cos(light_heading), math.sin(light_heading)
+    lamp_aim = (-tx, -ty, -0.35)                                 # back down the road
+    lens_x = lx - tx * 0.038
+    lens_y = ly - ty * 0.038
     for name, z, colour in (
         ("red", 0.415, "0.20 0.01 0.01 1"),
         ("yellow", 0.360, "0.18 0.12 0.01 1"),
