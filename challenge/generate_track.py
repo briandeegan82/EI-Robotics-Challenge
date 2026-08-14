@@ -548,6 +548,12 @@ def build() -> str:
         f'pos="{lx:.4f} {ly:.4f} 0.36" euler="0 0 {light_heading:.4f}" '
         f'rgba="0.08 0.08 0.08 1" contype="0" conaffinity="0"/>'
     )
+    # Each lamp also carries a real <light> (off by default; env.py drives
+    # both its geom colour and its light intensity together), so the active
+    # colour actually casts a glow on the pole and road below it instead of
+    # just being a flat-shaded sphere.
+    nx, ny = -math.sin(light_heading), math.cos(light_heading)   # left normal
+    lamp_aim = (-nx, -ny, -0.35)                                 # back toward the road
     for name, z, colour in (
         ("red", 0.415, "0.20 0.01 0.01 1"),
         ("yellow", 0.360, "0.18 0.12 0.01 1"),
@@ -557,6 +563,12 @@ def build() -> str:
             f'<geom name="traffic_{name}" type="sphere" size="0.018" '
             f'pos="{lx:.4f} {ly:.4f} {z}" rgba="{colour}" '
             f'contype="0" conaffinity="0"/>'
+        )
+        body.append(
+            f'<light name="traffic_{name}_light" pos="{lx:.4f} {ly:.4f} {z}" '
+            f'dir="{lamp_aim[0]:.4f} {lamp_aim[1]:.4f} {lamp_aim[2]:.4f}" '
+            f'diffuse="0 0 0" specular="0 0 0" attenuation="1 0 6" '
+            f'cutoff="60" castshadow="false"/>'
         )
 
     stop_x, stop_y, stop_heading = track.path_point(track.TRAFFIC_STOP_S)

@@ -135,6 +135,11 @@ class ChallengeEnv:
             "yellow": gid("traffic_yellow"),
             "green": gid("traffic_green"),
         }
+        self._traffic_lights = {
+            "red": self.model.light("traffic_red_light").id,
+            "yellow": self.model.light("traffic_yellow_light").id,
+            "green": self.model.light("traffic_green_light").id,
+        }
         self._fork_geoms = {
             "left": [gid("fork_sign_left_0"), gid("fork_sign_left_1")],
             "right": [gid("fork_sign_right_0"), gid("fork_sign_right_1")],
@@ -430,8 +435,19 @@ class ChallengeEnv:
             "yellow": [1.0, 0.75, 0.02, 1.0] if state == "yellow" else [0.18, 0.12, 0.01, 1.0],
             "green": [0.02, 1.0, 0.02, 1.0] if state == "green" else [0.01, 0.20, 0.01, 1.0],
         }
+        # only the active lamp actually lights up; the other two stay off
+        # (rather than merely dim) so there's a genuine glow to switch, not
+        # just a recoloured sphere
+        light_colours = {
+            "red": [2.5, 0.05, 0.05] if state == "red" else [0.0, 0.0, 0.0],
+            "yellow": [2.2, 1.6, 0.05] if state == "yellow" else [0.0, 0.0, 0.0],
+            "green": [0.05, 2.5, 0.05] if state == "green" else [0.0, 0.0, 0.0],
+        }
         for name, geom_id in self._traffic_geoms.items():
             self.model.geom_rgba[geom_id] = colours[name]
+        for name, light_id in self._traffic_lights.items():
+            self.model.light_diffuse[light_id] = light_colours[name]
+            self.model.light_specular[light_id] = light_colours[name]
 
     def _contact_hazards(self):
         out = set()
