@@ -58,6 +58,7 @@ import mujoco
 import numpy as np
 
 from . import track
+from .generate_track import T2_CAR_Z
 from .scoring import ScoreKeeper
 
 _ASSETS = Path(__file__).parent / "assets"
@@ -159,7 +160,13 @@ class ChallengeEnv:
                 "dyn_obstacle_frame_base",
                 "dyn_obstacle_seat",
                 "dyn_obstacle_handlebar",
-                "t2_obstacle_box",
+                "t2_obstacle_chassis",
+                "t2_obstacle_board",
+                "t2_obstacle_camera",
+                "t2_obstacle_fl_tire",
+                "t2_obstacle_fr_tire",
+                "t2_obstacle_rl_tire",
+                "t2_obstacle_rr_tire",
             )
         }
         for i in range(self.model.ngeom):
@@ -200,7 +207,13 @@ class ChallengeEnv:
         self.data.mocap_pos[self._t2_mocap] = [
             ox + nx * self.t2_side * T2_OBSTACLE_LAT,
             oy + ny * self.t2_side * T2_OBSTACLE_LAT,
-            0.09,
+            T2_CAR_Z,
+        ]
+        self.data.mocap_quat[self._t2_mocap] = [
+            np.cos(heading / 2),
+            0,
+            0,
+            np.sin(heading / 2),
         ]
 
         # fork sign: randomize which lane is required this attempt, and light

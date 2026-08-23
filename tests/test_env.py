@@ -20,6 +20,8 @@ class ExtendedCourseTests(unittest.TestCase):
             "dyn_obstacle_front_wheel",
             "dyn_obstacle_frame_base",
             "dyn_obstacle_handlebar",
+            "t2_obstacle_chassis",
+            "t2_obstacle_fl_tire",
             "traffic_red",
             "traffic_green",
             "traffic_stop_line",
@@ -196,6 +198,16 @@ class ExtendedCourseTests(unittest.TestCase):
         s, lateral = track.frenet(float(pos[0]), float(pos[1]))
         self.assertAlmostEqual(track.s_delta(s, track.T2_OBSTACLE_S), 0.0, places=6)
         self.assertAlmostEqual(abs(lateral), 0.14, places=6)
+
+    def test_tunnel_obstacle_is_upside_down_car_aligned_with_track(self):
+        self.env.reset(seed=0)
+        quat = self.env.data.mocap_quat[self.env._t2_mocap]
+        actual_yaw = 2 * math.atan2(float(quat[3]), float(quat[0]))
+        expected_yaw = track.path_point(track.T2_OBSTACLE_S)[2]
+        error = (actual_yaw - expected_yaw + math.pi) % (2 * math.pi) - math.pi
+        self.assertAlmostEqual(error, 0.0, places=6)
+        self.assertAlmostEqual(float(pos := self.env.data.mocap_pos[self.env._t2_mocap][2]), 0.02, places=6)
+        self.assertGreaterEqual(self.env.model.geom("t2_obstacle_rr_tire").id, 0)
 
     def test_dynamic_bicycle_is_rotated_across_track(self):
         self.env.reset(seed=0)

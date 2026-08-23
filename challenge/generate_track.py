@@ -217,6 +217,38 @@ def tunnel(name: str, s_range: tuple[float, float]) -> list[str]:
     return g
 
 
+# Wreck palette: warm body colour reads in the dark tunnel; dark tires match the
+# real car. Sized like the Rubik Pi platform (~22 x 16 cm), flipped roof-down —
+# a static obstacle scenario aligned with upcoming ISO scenario-based ADS testing
+# (overturned-vehicle detection in constrained visibility).
+T2_CAR_BODY = 'rgba="0.72 0.18 0.10 1"'
+T2_CAR_TIRE = 'rgba="0.08 0.08 0.08 1"'
+T2_CAR_DETAIL = 'rgba="0.12 0.12 0.12 1"'
+T2_CAR_BOARD = 'rgba="0.10 0.50 0.20 1"'
+# Chassis centre when the roof rests on the paved surface (ROAD_Z ≈ 0.02).
+T2_CAR_Z = 0.02
+
+
+def upside_down_car_obstacle(name: str, x: float, y: float) -> str:
+    """Tunnel #2 static obstacle: Rubik Pi-class car inverted on its roof."""
+    return f'''<body name="{name}" mocap="true" pos="{x:.3f} {y:.3f} {T2_CAR_Z:.3f}">
+      <geom name="{name}_chassis" type="box" size="0.11 0.07 0.02" pos="0 0 0"
+            {T2_CAR_BODY}/>
+      <geom name="{name}_board" type="box" size="0.045 0.05 0.012" pos="-0.02 0 -0.032"
+            {T2_CAR_BOARD}/>
+      <geom name="{name}_camera" type="box" size="0.01 0.012 0.01" pos="0.10 0 -0.06"
+            {T2_CAR_DETAIL}/>
+      <geom name="{name}_fl_tire" type="cylinder" size="0.032 0.012"
+            pos="0.075 0.07 0.052" zaxis="0 1 0" {T2_CAR_TIRE}/>
+      <geom name="{name}_fr_tire" type="cylinder" size="0.032 0.012"
+            pos="0.075 -0.07 0.052" zaxis="0 1 0" {T2_CAR_TIRE}/>
+      <geom name="{name}_rl_tire" type="cylinder" size="0.032 0.012"
+            pos="-0.075 0.07 0.052" zaxis="0 1 0" {T2_CAR_TIRE}/>
+      <geom name="{name}_rr_tire" type="cylinder" size="0.032 0.012"
+            pos="-0.075 -0.07 0.052" zaxis="0 1 0" {T2_CAR_TIRE}/>
+    </body>'''
+
+
 def checkerboard_gate(name: str, s: float) -> list[str]:
     """Semicircular checkerboard arch standing over the road at arc-length s."""
     x0, y0, heading = track.path_point(s)
@@ -531,9 +563,7 @@ def build() -> str:
     </body>''')
 
     ox, oy, _ = track.path_point(track.T2_OBSTACLE_S)
-    body.append(f'''<body name="t2_obstacle" mocap="true" pos="{ox:.3f} {oy:.3f} 0.09">
-      <geom name="t2_obstacle_box" type="box" size="0.055 0.055 0.07" rgba="0.3 0.55 0.8 1"/>
-    </body>''')
+    body.append(upside_down_car_obstacle("t2_obstacle", ox, oy))
 
     # Roadside traffic signal. The lenses are visual-only collision-wise;
     # env.py switches their emission/colour and judges the stop-line crossing.

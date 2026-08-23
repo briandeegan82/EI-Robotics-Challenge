@@ -22,7 +22,7 @@ simulation footprint:
        │
        │    glare ────────────────────────────────┐
        │                                         winding turn
-       └──── tunnel #2 (dark + block) ◄───────────┘
+       └──── tunnel #2 (dark + overturned car) ◄───────────┘
 ```
 
 Driving order: **start → lane keeping → choke → first descent → second turn →
@@ -134,7 +134,7 @@ tunnel each break a fixed brightness threshold in a different way:
 
 ![Tunnel #2 onboard view](images/img_03.png)
 
-*Approaching the dark tunnel #2, with the blue obstacle box inside.*
+*Approaching the dark tunnel #2, with the upside-down car obstacle inside.*
 
 **`info["privileged"]`** — ground truth (pose, arc length, lateral offset,
 obstacle positions) that the real robot will **not** have. Use it to get

@@ -180,7 +180,7 @@ class VisionLaneKeeper:
         steer = np.clip(-2.0 * (self.err + self.dodge_bias), -1, 1)
         if path_offset is not None:
             # The camera's road-centroid estimate is unreliable here (skewed by
-            # the dark tunnel wall/block, or split into two blobs by the fork
+            # the dark tunnel wall/overturned car, or split into two blobs by the fork
             # divider). Since both cases already use privileged information,
             # pursue an explicit offset point instead of a steering bias that
             # could be cancelled out by that skewed/split estimate.
