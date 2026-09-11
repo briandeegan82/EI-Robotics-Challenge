@@ -1,6 +1,6 @@
-# EI Robotics Challenge — Line-Following Simulator
+# EI Robotics Challenge
 
-A MuJoCo simulation of the **EI Robotics Challenge** autonomous line-following
+A MuJoCo simulation of the **EI Robotics Challenge** autonomous lane-keeping
 course. The real event runs on physical Rubik Pi vehicles; this repo lets teams
 learn the course, prototype vision and control, and practice before hardware day.
 
